@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+benchmark_out/
+dist/
+.env
+.DS_Store
+benchmark/results/*
+!benchmark/results/.gitkeep

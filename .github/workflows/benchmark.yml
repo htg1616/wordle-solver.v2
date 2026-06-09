@@ -1,0 +1,39 @@
+name: benchmark
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Direct benchmark smoke
+        run: bash scripts/run_quick_benchmark.sh
+
+      - name: HTTP protocol smoke
+        run: bash scripts/run_http_smoke.sh
+
+      - name: Build submission zip
+        run: bash scripts/make_submission_zip.sh
+
+      - name: Upload benchmark and dist artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-and-dist
+          path: |
+            benchmark/results/**
+            dist/**
