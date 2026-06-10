@@ -17,8 +17,8 @@ on:
         default: '0'
         required: false
       slow_threshold:
-        description: '느린 단어 기준 시간(초)'
-        default: '10.0'
+        description: '느린 단어 기준 턴 수 (score_turns 기준)'
+        default: '10'
         required: false
 
 jobs:
@@ -64,7 +64,7 @@ jobs:
             --chunk-count ${{ inputs.chunk_count || '26' }} \
             --tracks "${{ inputs.tracks || '1,2,3' }}" \
             --seeds "${{ inputs.seeds || '0' }}" \
-            --slow-threshold ${{ inputs.slow_threshold || '10.0' }} \
+            --slow-threshold ${{ inputs.slow_threshold || '10' }} \
             --out-dir benchmark/results/chunk_${{ matrix.chunk_index }}
 
       - name: 결과 업로드 (실패해도 업로드)
@@ -104,10 +104,9 @@ jobs:
 
           base = pathlib.Path("benchmark/results/chunks")
           all_rows = []
-          slow_threshold = float("${{ inputs.slow_threshold || '10.0' }}")
+          slow_threshold = int("${{ inputs.slow_threshold || '10' }}")
 
           # 모든 청크의 games.csv를 읽어 병합
-          first = True
           fields = None
           for games_csv in sorted(base.glob("*/games.csv")):
               with games_csv.open(newline="", encoding="utf-8") as f:
@@ -135,27 +134,28 @@ jobs:
               for row in all_rows:
                   f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
-          # 느린 단어 병합
+          # 느린 단어 병합 (score_turns 기준)
           slow_by_secret = {}
           for row in all_rows:
               try:
-                  act_s = float(row.get("act_wall_s", 0))
+                  score_turns = int(row.get("score_turns", 0))
               except (TypeError, ValueError):
-                  act_s = 0.0
-              if act_s > slow_threshold:
+                  score_turns = 0
+              if score_turns > slow_threshold:
                   sec = row["secret"]
-                  if sec not in slow_by_secret or act_s > slow_by_secret[sec]["max_act_wall_s"]:
+                  if sec not in slow_by_secret or score_turns > slow_by_secret[sec]["max_score_turns"]:
                       slow_by_secret[sec] = {
                           "secret": sec,
-                          "max_act_wall_s": round(act_s, 4),
+                          "max_score_turns": score_turns,
                           "track": row["track"],
                           "seed": row["seed"],
                           "status": row.get("status", ""),
-                          "score_turns": row.get("score_turns", ""),
+                          "turns": row.get("turns", ""),
+                          "act_wall_s": row.get("act_wall_s", ""),
                       }
-          slow_list = sorted(slow_by_secret.values(), key=lambda x: -x["max_act_wall_s"])
+          slow_list = sorted(slow_by_secret.values(), key=lambda x: -x["max_score_turns"])
           with (out / "slow_words.json").open("w", encoding="utf-8") as f:
-              json.dump({"threshold_s": slow_threshold, "count": len(slow_list), "words": slow_list}, f, indent=2, ensure_ascii=False)
+              json.dump({"threshold_turns": slow_threshold, "count": len(slow_list), "words": slow_list}, f, indent=2, ensure_ascii=False)
 
           # 실패 단어 병합
           failed_by_secret = {}

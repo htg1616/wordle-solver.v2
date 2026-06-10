@@ -58,7 +58,7 @@ except Exception:
     ZoneInfo = None  # type: ignore[assignment]
 
 DEFAULT_RESULTS_ROOT = SCRIPT_DIR / "results"
-DEFAULT_SLOW_THRESHOLD = 10.0   # 이 초 이상 걸린 게임의 단어를 slow_words에 기록
+DEFAULT_SLOW_THRESHOLD = 10   # 이 턴 수 이상 걸린 게임의 단어를 slow_words에 기록
 DEFAULT_CHECKPOINT_INTERVAL = 200
 
 
@@ -105,7 +105,7 @@ def append_checkpoint(path: Path, row: Dict[str, Any]) -> None:
 def write_outputs(
     out_dir: Path,
     all_rows: List[Dict[str, Any]],
-    slow_threshold: float,
+    slow_threshold: int,
     run_info: Dict[str, Any],
 ) -> None:
     """games.csv, games.jsonl, slow_words.json, failed_words.json, summary.json 저장."""
@@ -129,30 +129,31 @@ def write_outputs(
         for row in all_rows:
             f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
-    # 느린 단어: 어떤 (track, seed)에서든 act_wall_s > threshold 이면 기록
+    # 느린 단어: 어떤 (track, seed)에서든 score_turns > threshold 이면 기록
+    # score_turns: 성공 시 실제 턴 수, 실패 시 score_cap(100)
     slow_by_secret: Dict[str, Dict[str, Any]] = {}
     for row in all_rows:
         try:
-            act_s = float(row.get("act_wall_s", 0))
+            score_turns = int(row.get("score_turns", 0))
         except (TypeError, ValueError):
-            act_s = 0.0
-        if act_s > slow_threshold:
+            score_turns = 0
+        if score_turns > slow_threshold:
             secret = row["secret"]
-            if secret not in slow_by_secret or act_s > slow_by_secret[secret]["max_act_wall_s"]:
+            if secret not in slow_by_secret or score_turns > slow_by_secret[secret]["max_score_turns"]:
                 slow_by_secret[secret] = {
                     "secret": secret,
-                    "max_act_wall_s": round(act_s, 4),
+                    "max_score_turns": score_turns,
                     "track": int(row["track"]),
                     "seed": int(row["seed"]),
                     "status": row.get("status", ""),
-                    "score_turns": row.get("score_turns", ""),
                     "turns": row.get("turns", ""),
+                    "act_wall_s": row.get("act_wall_s", ""),
                 }
-    slow_list = sorted(slow_by_secret.values(), key=lambda x: -x["max_act_wall_s"])
+    slow_list = sorted(slow_by_secret.values(), key=lambda x: -x["max_score_turns"])
     slow_path = out_dir / "slow_words.json"
     with slow_path.open("w", encoding="utf-8") as f:
         json.dump(
-            {"threshold_s": slow_threshold, "count": len(slow_list), "words": slow_list},
+            {"threshold_turns": slow_threshold, "count": len(slow_list), "words": slow_list},
             f, indent=2, ensure_ascii=False,
         )
 
@@ -208,7 +209,7 @@ def write_outputs(
     print("\n저장된 파일:")
     print(f"  games.csv       : {csv_path}  ({total}행)")
     print(f"  games.jsonl     : {jsonl_path}")
-    print(f"  slow_words.json : {slow_path}  ({len(slow_list)}개, >{slow_threshold}s)")
+    print(f"  slow_words.json : {slow_path}  ({len(slow_list)}개, >{slow_threshold}턴)")
     print(f"  failed_words.json: {failed_path}  ({len(failed_list)}개)")
     print(f"  summary.json    : {summary_path}")
 
@@ -248,8 +249,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p.add_argument("--budget", type=float, default=60.0, help="게임당 최대 /act 총 시간(초)")
     p.add_argument("--score-cap", type=int, default=100)
     p.add_argument(
-        "--slow-threshold", type=float, default=DEFAULT_SLOW_THRESHOLD,
-        help=f"느린 단어 기준 act_wall_s(초), 기본 {DEFAULT_SLOW_THRESHOLD}s",
+        "--slow-threshold", type=int, default=DEFAULT_SLOW_THRESHOLD,
+        help=f"느린 단어 기준 score_turns(턴 수), 기본 {DEFAULT_SLOW_THRESHOLD}턴",
     )
     p.add_argument("--out-dir", default=None, help="결과 저장 디렉토리 (기본: benchmark/results/full_<timestamp>)")
     p.add_argument("--chunk-index", type=int, default=None, help="청크 인덱스 (0-based)")
@@ -307,7 +308,7 @@ def main(argv=None) -> int:
     print(f"  이번 청크 단어 수 : {len(chunk_words)}" + (f"  (청크 {args.chunk_index+1}/{args.chunk_count})" if args.chunk_count else ""))
     print(f"  트랙: {tracks},  시드: {seeds}")
     print(f"  총 게임 수: {total_games}  (완료: {len(completed)},  남은: {remaining})")
-    print(f"  느린 단어 기준   : act_wall_s > {args.slow_threshold}s")
+    print(f"  느린 단어 기준   : score_turns > {args.slow_threshold}턴")
     print(f"  출력 디렉토리    : {out_dir}")
     print(f"  체크포인트       : {checkpoint_path}")
     print()
@@ -399,7 +400,7 @@ def main(argv=None) -> int:
         "chunk_words": len(chunk_words),
         "games_total": total_games,
         "games_completed": total_completed,
-        "slow_threshold_s": args.slow_threshold,
+        "slow_threshold_turns": args.slow_threshold,
     }
     write_outputs(out_dir, all_rows, args.slow_threshold, run_info)
     return 0
