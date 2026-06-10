@@ -1,12 +1,12 @@
-# Benchmark pipeline
+# 벤치마크 파이프라인
 
-`benchmark/benchmark.py` is the only benchmark entry point. It builds local
-Wordle problems from `words.txt` or from an existing problem JSON, runs the
-solver, and saves the generated problems and benchmark results.
+`benchmark/benchmark.py`가 유일한 벤치마크 파이프라인 진입점입니다. 이 스크립트는
+`words.txt` 또는 기존 problem JSON에서 로컬 Wordle 문제를 만들고,
+solver를 실행한 뒤 생성된 문제와 벤치마크 결과를 저장합니다.
 
-## Defaults
+## 기본값
 
-When an argument is not given, the benchmark uses these defaults:
+인자를 지정하지 않으면 벤치마크는 다음 기본값을 사용합니다.
 
 ```text
 candidate list : every valid word in words.txt
@@ -15,30 +15,30 @@ results dir    : benchmark/results/YYYYMMDD_HHMMSS_<bench>_<mode>/
 latest copy    : benchmark/results/latest/
 ```
 
-Each run also stores the run date and time in Asia/Seoul time. The timestamp is
-written to `benchmark_run.json`, `benchmark_config.json`,
-`benchmark_summary.json`, `benchmark_problem_manifest.json`, and each row of
-`benchmark_games.csv` / `benchmark_games.jsonl`.
+각 실행은 날짜와 시간을 Asia/Seoul 시간대로 저장합니다. timestamp는
+`benchmark_run.json`, `benchmark_config.json`, `benchmark_summary.json`,
+`benchmark_problem_manifest.json`, 그리고 `benchmark_games.csv` /
+`benchmark_games.jsonl`의 각 row에 기록됩니다.
 
-## Output files
+## 출력 파일
 
-Each run writes:
+각 실행은 다음 파일을 만듭니다.
 
 ```text
 benchmark_run.json                  # run id, date/time, elapsed time, output dir
-benchmark_games.csv                 # one row per track/seed/problem game
-benchmark_games.jsonl               # same data, plus traces when --trace is set
-benchmark_summary.json              # aggregate success rate and score-turn stats
-benchmark_problems.json             # generated benchmark problems with candidates
-benchmark_problem_manifest.json     # compact reproducibility manifest
+benchmark_games.csv                 # track/seed/problem game마다 한 row
+benchmark_games.jsonl               # 같은 데이터와 --trace 사용 시 trace 포함
+benchmark_summary.json              # success rate와 score-turn 통계
+benchmark_problems.json             # candidate가 포함된 생성 문제
+benchmark_problem_manifest.json     # 재현을 위한 간단한 manifest
 benchmark_config.json               # CLI/source configuration
-single_problem_official_format.json # only when exactly one problem was generated
+single_problem_official_format.json # 문제가 정확히 하나 생성된 경우에만 생성
 ```
 
-## Single benchmark from words.txt
+## `words.txt`에서 Single benchmark 실행
 
-Minimal command. This uses the full `words.txt` as the candidate list, runs all
-tracks, and chooses an automatic results directory:
+최소 명령입니다. 전체 `words.txt`를 candidate list로 사용하고, 모든 track을
+실행하며, results directory는 자동으로 선택됩니다.
 
 ```bash
 python benchmark/benchmark.py \
@@ -46,7 +46,7 @@ python benchmark/benchmark.py \
   --secret hello
 ```
 
-Use a sampled candidate list instead of the full `words.txt`:
+전체 `words.txt` 대신 샘플링된 candidate list를 사용하려면:
 
 ```bash
 python benchmark/benchmark.py \
@@ -57,7 +57,7 @@ python benchmark/benchmark.py \
   --problem-seed 42
 ```
 
-Use an exact candidate list:
+candidate list를 직접 지정하려면:
 
 ```bash
 python benchmark/benchmark.py \
@@ -66,7 +66,7 @@ python benchmark/benchmark.py \
   --candidates hello,world,crane,slate,trace
 ```
 
-Use a candidate file:
+candidate file을 사용하려면:
 
 ```bash
 python benchmark/benchmark.py \
@@ -75,19 +75,19 @@ python benchmark/benchmark.py \
   --candidate-file my_candidates.txt
 ```
 
-If the exact candidate list omits the secret, the benchmark automatically adds
-it unless `--strict-candidates` is set.
+직접 지정한 candidate list에 secret이 빠져 있으면, `--strict-candidates`를
+설정하지 않은 경우 벤치마크가 secret을 자동으로 추가합니다.
 
-## Bulk benchmark from words.txt
+## `words.txt`에서 Bulk benchmark 실행
 
-Minimal command. This samples 10 secrets by default, gives each generated
-problem the full `words.txt` candidate list, and runs tracks 1, 2, and 3:
+최소 명령입니다. 기본적으로 secret 10개를 샘플링하고, 생성된 각 문제에
+전체 `words.txt` candidate list를 제공하며, track 1, 2, 3을 실행합니다.
 
 ```bash
 python benchmark/benchmark.py --benchmark bulk
 ```
 
-Sample many secrets and use sampled candidate lists:
+많은 secret과 샘플링된 candidate list를 사용하려면:
 
 ```bash
 python benchmark/benchmark.py \
@@ -99,7 +99,7 @@ python benchmark/benchmark.py \
   --seeds 0,1,2
 ```
 
-Run a specific secret list with one shared candidate list:
+특정 secret list와 하나의 공유 candidate list를 사용하려면:
 
 ```bash
 python benchmark/benchmark.py \
@@ -109,7 +109,7 @@ python benchmark/benchmark.py \
   --shared-candidates
 ```
 
-Use every word in `words.txt` as a secret:
+`words.txt`의 모든 단어를 secret으로 사용하려면:
 
 ```bash
 python benchmark/benchmark.py \
@@ -117,11 +117,12 @@ python benchmark/benchmark.py \
   --all-secrets
 ```
 
-This can be slow because it runs one game per secret, track, and seed.
+이 방식은 secret, track, seed 조합마다 한 game을 실행하므로 오래 걸릴 수
+있습니다.
 
-## Existing problem JSON
+## 기존 problem JSON 실행
 
-Run the official-style problem JSON in HTTP mode:
+공식 형식의 problem JSON을 HTTP mode로 실행하려면:
 
 ```bash
 python benchmark/benchmark.py \
@@ -130,9 +131,10 @@ python benchmark/benchmark.py \
   --mode http
 ```
 
-## Custom output directory
+## 사용자 지정 출력 디렉터리
 
-The output directory is automatic unless `--results-dir` or `--out-dir` is set:
+`--results-dir` 또는 `--out-dir`을 지정하지 않으면 output directory는
+자동으로 정해집니다.
 
 ```bash
 python benchmark/benchmark.py \
