@@ -134,7 +134,7 @@ jobs:
               for row in all_rows:
                   f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
-          # 느린 단어 병합 (score_turns 기준)
+          # 느린 단어 병합 (score_turns 기준, 단어별 모든 케이스 저장)
           slow_by_secret = {}
           for row in all_rows:
               try:
@@ -143,17 +143,21 @@ jobs:
                   score_turns = 0
               if score_turns > slow_threshold:
                   sec = row["secret"]
-                  if sec not in slow_by_secret or score_turns > slow_by_secret[sec]["max_score_turns"]:
-                      slow_by_secret[sec] = {
-                          "secret": sec,
-                          "max_score_turns": score_turns,
-                          "track": row["track"],
-                          "seed": row["seed"],
-                          "status": row.get("status", ""),
-                          "turns": row.get("turns", ""),
-                          "act_wall_s": row.get("act_wall_s", ""),
-                      }
-          slow_list = sorted(slow_by_secret.values(), key=lambda x: -x["max_score_turns"])
+                  slow_by_secret.setdefault(sec, []).append({
+                      "track": int(row["track"]),
+                      "seed": int(row["seed"]),
+                      "success": bool(int(row.get("success", 0))),
+                      "status": row.get("status", ""),
+                      "score_turns": score_turns,
+                      "turns": int(row.get("turns", 0)),
+                      "act_wall_s": row.get("act_wall_s", ""),
+                  })
+          slow_list = sorted(
+              [{"secret": k, "max_score_turns": max(c["score_turns"] for c in cases),
+                "cases": sorted(cases, key=lambda c: -c["score_turns"])}
+               for k, cases in slow_by_secret.items()],
+              key=lambda x: -x["max_score_turns"],
+          )
           with (out / "slow_words.json").open("w", encoding="utf-8") as f:
               json.dump({"threshold_turns": slow_threshold, "count": len(slow_list), "words": slow_list}, f, indent=2, ensure_ascii=False)
 
@@ -163,10 +167,11 @@ jobs:
               if int(row.get("success", 1)) == 0:
                   sec = row["secret"]
                   failed_by_secret.setdefault(sec, []).append({
-                      "track": row["track"],
-                      "seed": row["seed"],
+                      "track": int(row["track"]),
+                      "seed": int(row["seed"]),
                       "status": row.get("status", ""),
-                      "score_turns": row.get("score_turns", ""),
+                      "score_turns": int(row.get("score_turns", 0)),
+                      "turns": int(row.get("turns", 0)),
                       "act_wall_s": row.get("act_wall_s", ""),
                   })
           failed_list = sorted(

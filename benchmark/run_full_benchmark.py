@@ -131,7 +131,8 @@ def write_outputs(
 
     # 느린 단어: 어떤 (track, seed)에서든 score_turns > threshold 이면 기록
     # score_turns: 성공 시 실제 턴 수, 실패 시 score_cap(100)
-    slow_by_secret: Dict[str, Dict[str, Any]] = {}
+    # 단어별로 느린 케이스를 모두 저장, max_score_turns 내림차순 정렬
+    slow_by_secret: Dict[str, List[Dict[str, Any]]] = {}
     for row in all_rows:
         try:
             score_turns = int(row.get("score_turns", 0))
@@ -139,17 +140,26 @@ def write_outputs(
             score_turns = 0
         if score_turns > slow_threshold:
             secret = row["secret"]
-            if secret not in slow_by_secret or score_turns > slow_by_secret[secret]["max_score_turns"]:
-                slow_by_secret[secret] = {
-                    "secret": secret,
-                    "max_score_turns": score_turns,
-                    "track": int(row["track"]),
-                    "seed": int(row["seed"]),
-                    "status": row.get("status", ""),
-                    "turns": row.get("turns", ""),
-                    "act_wall_s": row.get("act_wall_s", ""),
-                }
-    slow_list = sorted(slow_by_secret.values(), key=lambda x: -x["max_score_turns"])
+            slow_by_secret.setdefault(secret, []).append({
+                "track": int(row["track"]),
+                "seed": int(row["seed"]),
+                "success": bool(int(row.get("success", 0))),
+                "status": row.get("status", ""),
+                "score_turns": score_turns,
+                "turns": int(row.get("turns", 0)),
+                "act_wall_s": row.get("act_wall_s", ""),
+            })
+    slow_list = sorted(
+        [
+            {
+                "secret": k,
+                "max_score_turns": max(c["score_turns"] for c in cases),
+                "cases": sorted(cases, key=lambda c: -c["score_turns"]),
+            }
+            for k, cases in slow_by_secret.items()
+        ],
+        key=lambda x: -x["max_score_turns"],
+    )
     slow_path = out_dir / "slow_words.json"
     with slow_path.open("w", encoding="utf-8") as f:
         json.dump(
@@ -166,7 +176,8 @@ def write_outputs(
                 "track": int(row["track"]),
                 "seed": int(row["seed"]),
                 "status": row.get("status", ""),
-                "score_turns": row.get("score_turns", ""),
+                "score_turns": int(row.get("score_turns", 0)),
+                "turns": int(row.get("turns", 0)),
                 "act_wall_s": row.get("act_wall_s", ""),
             })
     failed_list = sorted(
