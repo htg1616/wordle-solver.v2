@@ -1,21 +1,3 @@
-#!/usr/bin/env python3
-"""
-Noisy Wordle solver HTTP server for the DCCP Spring 2026 term project.
-
-This is a self-contained production implementation derived from the junior
-algorithm handoff, but modified for the actual grading protocol:
-  * no external/precomputed matrix files;
-  * candidate words are accepted only through /start_problem;
-  * feedback rows are built lazily and cached;
-  * the first-three-turn forced-noise rule is handled as an exact joint schedule;
-  * Tracks 2/3 use exact collapsed one-/two-letter mutation likelihoods rather
-    than a precomputed empirical confusion matrix.
-
-Run with:
-    python team00.py
-
-If your team number is not 00, rename this file to teamXX.py before submission.
-"""
 from __future__ import annotations
 
 import json
@@ -197,6 +179,8 @@ class NoisyWordleSolver:
         self.force_noise_turns = int(data.get("force_noise_turns", 3) or 3)
         self.max_turns = int(data.get("max_turns", 100) or 100)
         self.track = self._infer_track(self.p_one, self.p_two)
+        self.avg_near2, self.avg_near3 = self._estimate_cluster_profile()
+        self.hard_candidate_mode = self._is_hard_candidate_list()
         self.cfg = self._make_config()
 
         self.row_cache: Dict[int, np.ndarray] = {}
@@ -213,6 +197,7 @@ class NoisyWordleSolver:
         self.static_pool = self._make_static_pool()
         self.prefix_indices = self._make_prefix_indices()
         self.last_action: Optional[dict] = None
+        self.next_forced_probe_idx: Optional[int] = None
 
     @staticmethod
     def _infer_track(p_one: float, p_two: float) -> int:
@@ -222,13 +207,49 @@ class NoisyWordleSolver:
             return 3
         return 2
 
+    def _estimate_cluster_profile(self) -> Tuple[float, float]:
+        """Estimate how clustered the candidate list is.
+
+        Full 12k lists usually contain many broad information probes.  A custom
+        list made only of hard words often has many near-neighbours, so pure
+        posterior-top guessing is dangerous.  We cheaply estimate the average
+        number of words within Hamming distance <=2 and <=3 on a deterministic
+        sample and use it to enable hard-candidate mode.
+        """
+        if self.N <= 1:
+            return 0.0, 0.0
+        sample_n = min(self.N, 384)
+        if sample_n == self.N:
+            sample_idx = np.arange(self.N, dtype=np.int32)
+        else:
+            sample_idx = np.linspace(0, self.N - 1, sample_n, dtype=np.int32)
+        near2_total = 0.0
+        near3_total = 0.0
+        for idx0 in sample_idx:
+            dist = np.count_nonzero(self.enc != self.enc[int(idx0)], axis=1)
+            near2_total += float(np.count_nonzero(dist <= 2) - 1)
+            near3_total += float(np.count_nonzero(dist <= 3) - 1)
+        return near2_total / float(sample_n), near3_total / float(sample_n)
+
+    def _is_hard_candidate_list(self) -> bool:
+        """Detect small or intentionally difficult candidate lists."""
+        if self.N <= 1500:
+            return True
+        if self.N <= 3500 and self.avg_near3 >= 18.0:
+            return True
+        if self.avg_near2 >= 7.0 or self.avg_near3 >= 45.0:
+            return True
+        return False
+
     def _make_config(self) -> SolverConfig:
         max_submit_turn = max(1, min(self.max_turns - 1, 99))
         if self.track == 1:
             prefix = ("tares", "solan", "deils")
             return SolverConfig(
                 track=1, prefix=prefix,
-                pool_size=self._adapt_pool(160), static_pool_size=self._adapt_pool(128), top_post_pool_size=min(96, self.N),
+                pool_size=self._adapt_pool(224 if self.hard_candidate_mode else 160),
+                static_pool_size=self._adapt_pool(192 if self.hard_candidate_mode else 128),
+                top_post_pool_size=min(160 if self.hard_candidate_mode else 96, self.N),
                 min_submit_turn=4, threshold=0.999999, odds_threshold=1e9,
                 topk_confirm=0, topk_mass_min=1.0, retry_gap=0,
                 force_submit_turn=min(40, max_submit_turn), alpha=1.0, mix_epsilon=0.0,
@@ -239,9 +260,14 @@ class NoisyWordleSolver:
             prefix = ("tares", "choli", "bunny")
             return SolverConfig(
                 track=2, prefix=prefix,
-                pool_size=self._adapt_pool(288), static_pool_size=self._adapt_pool(256), top_post_pool_size=min(160, self.N),
-                min_submit_turn=5, threshold=0.995, odds_threshold=500.0,
-                topk_confirm=min(48, self.N), topk_mass_min=0.90, retry_gap=3,
+                pool_size=self._adapt_pool(448 if self.hard_candidate_mode else 288),
+                static_pool_size=self._adapt_pool(384 if self.hard_candidate_mode else 256),
+                top_post_pool_size=min(288 if self.hard_candidate_mode else 160, self.N),
+                min_submit_turn=6 if not self.hard_candidate_mode else 5,
+                threshold=0.996 if self.hard_candidate_mode else 0.9965,
+                odds_threshold=800.0 if self.hard_candidate_mode else 650.0,
+                topk_confirm=(min(self.N, 256) if self.hard_candidate_mode else min(64, self.N)),
+                topk_mass_min=0.96 if self.hard_candidate_mode else 0.92, retry_gap=1 if self.hard_candidate_mode else 2,
                 force_submit_turn=min(70, max_submit_turn), alpha=1.0, mix_epsilon=1e-10,
             )
         # Track 3 is very noisy.  Use the handoff's conservative gate, but exact
@@ -250,17 +276,31 @@ class NoisyWordleSolver:
         prefix = ("tares", "solan", "deils")
         return SolverConfig(
             track=3, prefix=prefix,
-            pool_size=self._adapt_pool(448), static_pool_size=self._adapt_pool(224), top_post_pool_size=min(288, self.N),
-            min_submit_turn=5, threshold=0.985, odds_threshold=120.0,
-            topk_confirm=min(96, self.N), topk_mass_min=0.88, retry_gap=2,
+            pool_size=self._adapt_pool(672 if self.hard_candidate_mode else 448),
+            static_pool_size=self._adapt_pool(384 if self.hard_candidate_mode else 224),
+            top_post_pool_size=min(384 if self.hard_candidate_mode else 288, self.N),
+            min_submit_turn=5, threshold=0.988 if self.hard_candidate_mode else 0.985,
+            odds_threshold=180.0 if self.hard_candidate_mode else 120.0,
+            topk_confirm=(min(self.N, 384) if self.hard_candidate_mode else min(96, self.N)),
+            topk_mass_min=0.94 if self.hard_candidate_mode else 0.88, retry_gap=1 if self.hard_candidate_mode else 2,
             force_submit_turn=min(60, max_submit_turn), alpha=0.95, mix_epsilon=1e-10,
         )
 
     def _adapt_pool(self, target: int) -> int:
-        if self.N <= 250:
+        # Hard-only candidate lists are often much smaller and more clustered than
+        # the full dictionary.  In that regime, evaluating more/all candidate
+        # guesses is worth the extra compute because broad static probes may not
+        # exist in the supplied list.
+        if self.hard_candidate_mode:
+            if self.N <= 1800:
+                return self.N
+            if self.N <= 4000:
+                return min(self.N, max(target, 768))
+            return min(self.N, max(target, 640))
+        if self.N <= 350:
             return self.N
         if self.N <= 1000:
-            return min(self.N, max(target, 192))
+            return min(self.N, max(target, 224))
         return min(self.N, target)
 
     def _make_prefix_schedules(self) -> List[Tuple[Tuple[int, int, int], float]]:
@@ -334,9 +374,64 @@ class NoisyWordleSolver:
         top = top[np.argsort(scores[top])[::-1]]
         return top.astype(np.int32)
 
+    def _initial_entropy_probe_indices(self, count: int = 3) -> List[int]:
+        """Pick robust openers from the supplied candidate list itself.
+
+        When the candidate list contains only hard words, the usual broad opener
+        words may be absent.  For small/clustered lists we spend a little start
+        time selecting candidate guesses that split the provided list well under
+        clean Wordle feedback.  This is intentionally capped so /start_problem
+        remains fast even for medium-sized custom lists.
+        """
+        if self.N <= 1:
+            return [0]
+        pool_limit = 512 if self.hard_candidate_mode else 256
+        if self.N <= pool_limit:
+            pool = np.arange(self.N, dtype=np.int32)
+        else:
+            pool = self.static_pool[:min(len(self.static_pool), pool_limit)].astype(np.int32)
+        weights = np.ones(self.N, dtype=np.float64) / float(self.N)
+        selected: List[int] = []
+        used = set()
+        for _ in range(min(count, self.N)):
+            best_idx = None
+            best_score = -1e100
+            for gi0 in pool:
+                gi = int(gi0)
+                if gi in used:
+                    continue
+                row = self.row(gi)
+                mass = np.bincount(row, weights=weights, minlength=N_PATTERNS).astype(np.float64)
+                score = entropy_from_mass(mass)
+                # Avoid picking three almost identical probes from the same hard
+                # cluster.  The first probe is pure entropy; later probes receive
+                # a small diversity penalty if they are too close to an already
+                # selected opener.
+                for prev in selected:
+                    h = self._hamming_idx(gi, prev)
+                    if h <= 2:
+                        score -= 0.20
+                    elif h == 3:
+                        score -= 0.06
+                if score > best_score:
+                    best_score = score
+                    best_idx = gi
+            if best_idx is None:
+                break
+            selected.append(int(best_idx))
+            used.add(int(best_idx))
+        return selected
+
     def _make_prefix_indices(self) -> List[int]:
         indices: List[int] = []
         used = set()
+        if self.hard_candidate_mode:
+            for idx in self._initial_entropy_probe_indices(count=3):
+                if idx not in used:
+                    indices.append(int(idx))
+                    used.add(int(idx))
+                if len(indices) >= 3:
+                    return indices
         for w in self.cfg.prefix:
             idx = self.word_to_idx.get(w)
             if idx is not None and idx not in used:
@@ -437,53 +532,262 @@ class NoisyWordleSolver:
             accum += prod
         return normalize(accum)
 
-    def _full_exact_topk_confirmation(self, topk: np.ndarray, approx_top: int) -> dict:
-        """Replay untempered exact posterior on the current top-K set only."""
+    def _replay_exact_topk(self, topk: np.ndarray, skip_history_index: Optional[int] = None, alpha: float = 1.0) -> np.ndarray:
+        """Replay a local posterior on a supplied top-K candidate set.
+
+        alpha=1.0 is the exact replay.  alpha<1.0 is used only as a
+        conservative submit-stability check; it asks whether the same winner
+        survives after tempering potentially lucky noisy observations.
+
+        The original confirmation code replayed the current top-K set once.  For
+        submit safety we also need leave-one-observation-out checks.  This helper
+        keeps the exact first-three forced-noise marginalization, even when one of
+        the prefix observations is skipped: each remaining prefix observation uses
+        the noise type from its actual turn in the joint schedule.
+        """
         K = int(len(topk))
         if K == 0:
-            return {"passed": False, "reason": "empty_topk"}
-        # First three observations: exact joint forced-noise schedule.
-        k_prefix = min(3, len(self.likelihood_history))
-        if k_prefix > 0:
+            return np.zeros(0, dtype=np.float64)
+
+        prefix_items: List[Tuple[int, np.ndarray, np.ndarray, np.ndarray]] = []
+        later_items: List[Tuple[int, np.ndarray, np.ndarray, np.ndarray]] = []
+        for hist_i, (turn0, L0, L1, L2) in enumerate(self.likelihood_history):
+            if skip_history_index is not None and hist_i == int(skip_history_index):
+                continue
+            if int(turn0) <= 3:
+                prefix_items.append((int(turn0), L0, L1, L2))
+            else:
+                later_items.append((int(turn0), L0, L1, L2))
+
+        if prefix_items:
             accum = np.zeros(K, dtype=np.float64)
-            like_by_t = [(L0[topk], L1[topk], L2[topk]) for _, L0, L1, L2 in self.likelihood_history[:k_prefix]]
             for seq, prior in self.prefix_schedules:
                 prod = np.full(K, prior, dtype=np.float64)
-                for t in range(k_prefix):
-                    prod *= like_by_t[t][seq[t]]
+                for turn0, L0, L1, L2 in prefix_items:
+                    noise_type = int(seq[max(0, min(2, turn0 - 1))])
+                    like0 = np.maximum((L0, L1, L2)[noise_type][topk], 1e-15)
+                    prod *= np.power(like0, float(alpha)) if alpha != 1.0 else like0
                 accum += prod
             local = normalize(accum)
         else:
             local = np.ones(K, dtype=np.float64) / K
-        # Later observations: independent type mixture.  Track 1 uses clean only.
-        for turn, L0, L1, L2 in self.likelihood_history[k_prefix:]:
+
+        for turn0, L0, L1, L2 in later_items:
             if self.track == 1:
                 like = L0[topk]
             else:
-                p0, p1, p2 = self.type_probs_after_prefix(turn)
+                p0, p1, p2 = self.type_probs_after_prefix(turn0)
                 like = p0 * L0[topk] + p1 * L1[topk] + p2 * L2[topk]
-            local = normalize(local * np.maximum(like, 1e-15))
+            like = np.maximum(like, 1e-15)
+            if alpha != 1.0:
+                like = np.power(like, float(alpha))
+            local = normalize(local * like)
+        return local
+
+    def _local_stats(self, topk: np.ndarray, local: np.ndarray) -> Tuple[int, float, float, float, np.ndarray]:
         order = np.argsort(local)[::-1]
-        winner_local = int(order[0])
-        winner = int(topk[winner_local])
-        pmax = float(local[winner_local])
-        p2 = float(local[int(order[1])]) if K > 1 else 0.0
+        winner = int(topk[int(order[0])])
+        pmax = float(local[int(order[0])])
+        p2 = float(local[int(order[1])]) if len(order) > 1 else 0.0
         odds = pmax / max(p2, 1e-300)
+        return winner, pmax, p2, odds, order
+
+    def _hamming_idx(self, a: int, b: int) -> int:
+        return int(np.count_nonzero(self.enc[int(a)] != self.enc[int(b)]))
+
+    def _letter_overlap_idx(self, a: int, b: int) -> int:
+        return int(np.minimum(self.counts[int(a)], self.counts[int(b)]).sum())
+
+    def _is_close_competitor(self, a: int, b: int) -> bool:
+        """Structural closeness guard for near-neighbour submit failures."""
+        aw = self.words[int(a)]
+        bw = self.words[int(b)]
+        h = self._hamming_idx(a, b)
+        if h <= 2:
+            return True
+        overlap = self._letter_overlap_idx(a, b)
+        if h <= 3 and overlap >= 4:
+            return True
+        if h <= 3 and (aw[:2] == bw[:2] or aw[-2:] == bw[-2:]):
+            return True
+        if self.hard_candidate_mode:
+            # Hard-only lists may be intentionally made of words that share most
+            # letters but differ across several positions.  Treat these as a
+            # submit-risk cluster even when Hamming distance is four.
+            if h <= 4 and overlap >= 4:
+                return True
+            if h <= 4 and (aw[:2] == bw[:2] or aw[-2:] == bw[-2:]):
+                return True
+        return False
+
+    def _close_competitors_from_local(self, topk: np.ndarray, local: np.ndarray, top: int, limit: int = 16) -> List[int]:
+        """Return close alternatives to top, ordered by exact local posterior."""
+        if len(topk) <= 1:
+            return []
+        order = np.argsort(local)[::-1]
+        out: List[int] = []
+        # Very small probabilities can still matter after noisy evidence, but we
+        # do not want to direct-query dozens of posterior dust words.
+        floor = 1e-5 if self.track == 3 else 3e-5
+        for loc in order:
+            idx = int(topk[int(loc)])
+            if idx == int(top):
+                continue
+            if float(local[int(loc)]) < floor and len(out) >= 3:
+                break
+            if self._is_close_competitor(int(top), idx):
+                out.append(idx)
+                if len(out) >= limit:
+                    break
+        return out
+
+    def _find_local_position(self, topk: np.ndarray, idx: int) -> Optional[int]:
+        hits = np.flatnonzero(topk == int(idx))
+        if len(hits) == 0:
+            return None
+        return int(hits[0])
+
+    def _suggest_submit_probe(self, topk: np.ndarray, local: np.ndarray, top: int, close: List[int]) -> int:
+        """Choose the next direct probe after a submit veto."""
+        direct_top = self._direct_query_count(int(top))
+        # T2 failures were mostly early near-neighbour submits; two direct probes
+        # of the proposed top are a cheap calibration step.  T3 is much noisier,
+        # so use three direct probes when a close cluster is still alive.
+        need_top = 3 if self.track == 3 and close else 2
+        if direct_top < need_top:
+            return int(top)
+
+        best_idx = int(top)
+        best_score = -1.0
+        for idx in close[:8]:
+            pos = self._find_local_position(topk, int(idx))
+            if pos is None:
+                continue
+            prob = float(local[pos])
+            dq = self._direct_query_count(int(idx))
+            # Query the most plausible unconfirmed close competitor first.
+            if dq >= (2 if self.track == 3 and prob > 0.01 else 1):
+                continue
+            score = prob / float(dq + 1)
+            if idx not in self.guessed:
+                score *= 1.15
+            if score > best_score:
+                best_score = score
+                best_idx = int(idx)
+        if best_idx != int(top):
+            return best_idx
+        if close:
+            cluster = [int(top)] + [int(x) for x in close[:12]]
+            return self._head_ejs_discriminator(int(top), k=min(128, max(32, len(topk))), gamma=0.0, cluster=cluster)
+        return int(top)
+
+    def _full_exact_topk_confirmation(self, topk: np.ndarray, approx_top: int, turn: int) -> dict:
+        """Replay exact posterior on top-K and apply conservative submit safety gates."""
+        K = int(len(topk))
+        if K == 0:
+            return {"passed": False, "reason": "empty_topk"}
+
+        local = self._replay_exact_topk(topk)
+        winner, exact_pmax, exact_p2, exact_odds, order = self._local_stats(topk, local)
         topk_mass = float(np.sum(self.pi[topk]))
-        passed = bool(
+        base_pass = bool(
             winner == int(approx_top)
-            and pmax >= self.cfg.threshold
-            and odds >= self.cfg.odds_threshold
+            and exact_pmax >= self.cfg.threshold
+            and exact_odds >= self.cfg.odds_threshold
             and topk_mass >= self.cfg.topk_mass_min
         )
-        return {
-            "passed": passed,
+        info = {
+            "passed": base_pass,
             "winner": winner,
-            "exact_pmax": pmax,
-            "exact_odds": odds,
+            "exact_pmax": exact_pmax,
+            "exact_odds": exact_odds,
             "topk_mass": topk_mass,
             "K": K,
+            "reason": "base_pass" if base_pass else "base_gate",
+            "suggested_probe": int(winner),
         }
+        if not base_pass:
+            info["suggested_probe"] = int(winner if winner != int(approx_top) else approx_top)
+            return info
+
+        if self.track == 1:
+            return info
+
+        close = self._close_competitors_from_local(topk, local, int(approx_top), limit=(24 if self.hard_candidate_mode else 16))
+        info["close_count"] = len(close)
+        if close:
+            direct_top = self._direct_query_count(int(approx_top))
+            need_top = 3 if self.track == 3 else 2
+            if direct_top < need_top:
+                info.update({
+                    "passed": False,
+                    "reason": "need_more_direct_top",
+                    "suggested_probe": int(approx_top),
+                })
+                return info
+
+            # Do not submit while a close competitor with non-negligible exact mass
+            # has never been directly queried.  This is the main fix for the 29
+            # wrong-submit cases, all of which were close-cluster overconfidence.
+            if self.hard_candidate_mode:
+                comp_floor = 2e-5 if self.track == 2 else 5e-6
+                close_scan = 10
+            else:
+                comp_floor = 2e-4 if self.track == 2 else 7e-5
+                close_scan = 6
+            for idx in close[:close_scan]:
+                pos = self._find_local_position(topk, idx)
+                prob = float(local[pos]) if pos is not None else 0.0
+                if prob >= comp_floor and self._direct_query_count(idx) == 0:
+                    info.update({
+                        "passed": False,
+                        "reason": "unqueried_close_competitor",
+                        "suggested_probe": int(idx),
+                    })
+                    return info
+
+            # Conservative tempered replay.  Exact replay can become more
+            # overconfident on the same lucky noisy evidence; a tempered replay
+            # is a cheap stability check that should preserve the same winner in
+            # close-cluster situations before we submit.
+            robust_alpha = 0.86 if self.track == 2 else 0.82
+            if exact_pmax < (0.9997 if self.track == 2 else 0.9995):
+                robust = self._replay_exact_topk(topk, alpha=robust_alpha)
+                robust_winner, robust_pmax, _, robust_odds, _ = self._local_stats(topk, robust)
+                if robust_winner != int(approx_top) and self._is_close_competitor(int(approx_top), robust_winner):
+                    info.update({
+                        "passed": False,
+                        "reason": "robust_tempered_unstable",
+                        "suggested_probe": int(self._suggest_submit_probe(topk, local, int(approx_top), close)),
+                        "robust_winner": int(robust_winner),
+                        "robust_pmax": float(robust_pmax),
+                        "robust_odds": float(robust_odds),
+                    })
+                    return info
+
+            # Leave-one-observation-out stability.  If removing one recent piece of
+            # evidence changes the winner to a close competitor, the posterior is
+            # still brittle, so ask that competitor/top once more instead of
+            # risking a 100-turn wrong submit.
+            stable_until = (30 if self.track == 2 else 40) if self.hard_candidate_mode else (22 if self.track == 2 else 30)
+            if turn < stable_until:
+                start = max(0, len(self.likelihood_history) - 8)
+                for hist_i in range(start, len(self.likelihood_history)):
+                    loo = self._replay_exact_topk(topk, skip_history_index=hist_i)
+                    loo_winner, loo_pmax, _, loo_odds, _ = self._local_stats(topk, loo)
+                    if loo_winner != int(approx_top) and self._is_close_competitor(int(approx_top), loo_winner):
+                        probe = loo_winner if self._direct_query_count(loo_winner) == 0 else int(approx_top)
+                        info.update({
+                            "passed": False,
+                            "reason": "loo_unstable_close_winner",
+                            "suggested_probe": int(probe),
+                            "loo_winner": int(loo_winner),
+                            "loo_odds": float(loo_odds),
+                            "loo_pmax": float(loo_pmax),
+                        })
+                        return info
+
+        return info
 
     def type_probs_after_prefix(self, turn: int) -> Tuple[float, float, float]:
         if self.track == 1:
@@ -544,10 +848,12 @@ class NoisyWordleSolver:
             return None
         force = turn >= self.cfg.force_submit_turn
         gate = pmax >= self.cfg.threshold and odds >= self.cfg.odds_threshold
-        if not force and not gate:
+        if not gate:
+            # A forced wrong submit has the same 100-turn cap as not solving, so
+            # only use the force path at the very end as a last-resort guess.
+            if force and turn >= max(self.max_turns - 1, self.cfg.force_submit_turn):
+                return int(top)
             return None
-        if force:
-            return int(top)
         # Track 3 safety guard: a single noisy observation of the current top
         # answer can make the exact posterior look overconfident.  Before
         # submitting in the high two-letter-noise track, require that the
@@ -562,9 +868,12 @@ class NoisyWordleSolver:
             return None
         K = min(max(2, self.cfg.topk_confirm), self.N)
         topk = np.argpartition(self.pi, -K)[-K:]
-        info = self._full_exact_topk_confirmation(topk.astype(np.int32), int(top))
+        info = self._full_exact_topk_confirmation(topk.astype(np.int32), int(top), int(turn))
         if bool(info.get("passed", False)):
             return int(top)
+        probe = info.get("suggested_probe")
+        if probe is not None and 0 <= int(probe) < self.N:
+            self.next_forced_probe_idx = int(probe)
         self.exact_confirm_veto_until = turn + self.cfg.retry_gap
         return None
 
@@ -650,6 +959,195 @@ class NoisyWordleSolver:
                 best = idx
         return best
 
+    def _head_ejs_discriminator(
+        self,
+        top: int,
+        k: int = 96,
+        gamma: float = 0.5,
+        cluster: Optional[Sequence[int]] = None,
+    ) -> int:
+        """Pick a clean-feedback EJS/EC2 discriminator on the posterior head.
+
+        This is intentionally deterministic and row-cache based.  It does not
+        try to enumerate noisy observations; instead it fixes the main weakness
+        of posterior-weighted entropy in the endgame by tempering or flattening
+        the head weights.  gamma=1 uses posterior weights, gamma=0 uses uniform
+        weights, and values in between keep runner-ups alive.
+        """
+        if cluster is not None and len(cluster) > 0:
+            head = np.array([int(x) for x in cluster if 0 <= int(x) < self.N], dtype=np.int32)
+            if len(head) == 0:
+                head = np.array([int(top)], dtype=np.int32)
+            head = np.unique(head)
+            # Put the current top first if it is present/needed, then append the
+            # largest posterior hypotheses to make the probe robust to nearby tail.
+            if int(top) not in set(map(int, head)):
+                head = np.concatenate([np.array([int(top)], dtype=np.int32), head])
+            if len(head) < min(k, self.N):
+                kk = min(max(k, len(head)), self.N)
+                extra = np.argpartition(self.pi, -kk)[-kk:].astype(np.int32)
+                head = np.unique(np.concatenate([head, extra]))
+        else:
+            k = min(max(8, k), self.N)
+            head = np.argpartition(self.pi, -k)[-k:].astype(np.int32)
+
+        if len(head) <= 1:
+            return int(top)
+        # Sort by posterior for stable pool expansion and weight construction.
+        head = head[np.argsort(self.pi[head])[::-1]]
+        raw_w = np.maximum(self.pi[head].astype(np.float64), 1e-300)
+        if gamma <= 0.0:
+            w = np.ones(len(head), dtype=np.float64) / float(len(head))
+        else:
+            w = np.power(raw_w, float(gamma))
+            w = normalize(w)
+
+        pool = self.choose_pool()
+        pool = np.unique(np.concatenate([pool.astype(np.int32), head.astype(np.int32), np.array([int(top)], dtype=np.int32)]))
+        best_score = -1e100
+        best_idx = int(top)
+        eps = 1e-6
+        for gi0 in pool:
+            gi = int(gi0)
+            row = self.row(gi)[head]
+            mass = np.bincount(row, weights=w, minlength=N_PATTERNS).astype(np.float64)
+            same_mass = mass[row]
+            other_same = (same_mass - w) / np.maximum(1.0 - w, 1e-12)
+            ejs = float(np.sum(w * (-np.log2(np.maximum(other_same, eps)))))
+            ec2 = float(1.0 - np.sum(mass * mass))
+            ent = entropy_from_mass(mass)
+            score = ejs + 0.35 * ent + 0.25 * ec2
+            # Slightly prefer plausible final answers and avoid repeats; the
+            # information score remains dominant.
+            score += 0.04 * float(self.pi[gi])
+            if gi == int(top):
+                score -= 0.04
+            if gi in self.guessed:
+                score -= 0.035
+            if score > best_score:
+                best_score = score
+                best_idx = gi
+        return int(best_idx)
+
+
+    def _sampled_noisy_eig_discriminator(self, top: int, k: int = 20, pool_limit: int = 72, gamma: float = 0.65) -> int:
+        """Approximate noisy expected information gain on a small posterior head.
+
+        This is a midgame scorer for Tracks 2/3.  It approximates
+        P(observed feedback | secret, guess) by sampling effective-secret
+        mutations.  It is intentionally used only on small heads/pools so the
+        submit-safety logic remains unchanged and runtime stays bounded.
+        """
+        if self.track == 1 or self.N <= 1:
+            return int(top)
+        k = min(max(8, int(k)), self.N)
+        head = np.argpartition(self.pi, -k)[-k:].astype(np.int32)
+        head = head[np.argsort(self.pi[head])[::-1]]
+        raw_w = np.maximum(self.pi[head].astype(np.float64), 1e-300)
+        if gamma <= 0.0:
+            hyp_w = np.ones(len(head), dtype=np.float64) / float(len(head))
+        else:
+            hyp_w = normalize(np.power(raw_w, float(gamma)))
+
+        # Construct a compact deterministic sample bank of effective secrets.
+        # Clean: 1 sample.  One-letter: 5 positions x 5 replacement offsets.
+        # Two-letter: 10 pairs x 4 offset pairs.
+        p0, p1, p2 = self.type_probs_after_prefix(max(4, len(self.history) + 1))
+        owners = []
+        eff_rows = []
+        eff_weights = []
+        one_offsets = (1, 5, 9, 13, 17)
+        two_offsets = ((1, 7), (5, 11), (9, 17), (13, 23))
+        for oi, idx0 in enumerate(head):
+            idx = int(idx0)
+            base_word = self.enc[idx]
+            # Clean.
+            owners.append(oi)
+            eff_rows.append(base_word.copy())
+            eff_weights.append(float(p0))
+            # One-letter sample.
+            if p1 > 0.0:
+                w1 = float(p1) / 25.0
+                for pos in range(5):
+                    orig = int(base_word[pos])
+                    for off in one_offsets:
+                        repl = (orig + int(off)) % 26
+                        if repl == orig:
+                            repl = (repl + 1) % 26
+                        row = base_word.copy()
+                        row[pos] = repl
+                        owners.append(oi)
+                        eff_rows.append(row)
+                        eff_weights.append(w1)
+            # Two-letter sample.
+            if p2 > 0.0:
+                w2 = float(p2) / (len(PAIRS) * len(two_offsets))
+                for pos1, pos2 in PAIRS:
+                    o1 = int(base_word[pos1])
+                    o2 = int(base_word[pos2])
+                    for off1, off2 in two_offsets:
+                        r1 = (o1 + int(off1)) % 26
+                        r2 = (o2 + int(off2)) % 26
+                        if r1 == o1:
+                            r1 = (r1 + 1) % 26
+                        if r2 == o2:
+                            r2 = (r2 + 1) % 26
+                        row = base_word.copy()
+                        row[pos1] = r1
+                        row[pos2] = r2
+                        owners.append(oi)
+                        eff_rows.append(row)
+                        eff_weights.append(w2)
+        owners_arr = np.asarray(owners, dtype=np.int32)
+        eff_arr = np.vstack(eff_rows).astype(np.uint8, copy=False)
+        eff_w = np.asarray(eff_weights, dtype=np.float64)
+
+        pool = self.choose_pool()
+        # Keep a balanced small pool: posterior heads + static openers + candidate head.
+        top_pool = np.argpartition(self.pi, -min(self.N, max(32, pool_limit // 2)))[-min(self.N, max(32, pool_limit // 2)):].astype(np.int32)
+        static_keep = self.static_pool[:min(len(self.static_pool), max(16, pool_limit // 2))].astype(np.int32)
+        pool = np.unique(np.concatenate([pool.astype(np.int32), top_pool, static_keep, head.astype(np.int32), np.array([int(top)], dtype=np.int32)]))
+        if len(pool) > pool_limit:
+            # Score candidates cheaply for truncation: keep high-posterior answer candidates and static probes.
+            bonus = self.pi[pool].astype(np.float64)
+            static_set = set(int(x) for x in static_keep)
+            for j, gi in enumerate(pool):
+                if int(gi) in static_set:
+                    bonus[j] += 0.02
+            pool = pool[np.argsort(bonus)[-int(pool_limit):]].astype(np.int32)
+
+        best_idx = int(top)
+        best_score = -1e100
+        eps = 1e-12
+        for gi0 in pool:
+            gi = int(gi0)
+            pids = feedback_ids_for_guess(self.enc[gi], eff_arr)
+            Q = np.zeros((len(head), N_PATTERNS), dtype=np.float64)
+            np.add.at(Q, (owners_arr, pids.astype(np.int32)), eff_w)
+            # Numerical normalization absorbs sampling imbalance when p0/p1/p2 edge cases occur.
+            row_s = Q.sum(axis=1)
+            good = row_s > 0.0
+            Q[good] /= row_s[good, None]
+            pred = hyp_w @ Q
+            Hp = entropy_from_mass(pred)
+            Hc = 0.0
+            for i in range(len(head)):
+                Hc += float(hyp_w[i]) * entropy_from_mass(Q[i])
+            eig = Hp - Hc
+            # Pairwise split on clean head is cheap and helps when sampled noisy EIG is flat.
+            clean_row = self.row(gi)[head]
+            mass = np.bincount(clean_row, weights=hyp_w, minlength=N_PATTERNS).astype(np.float64)
+            ec2 = float(1.0 - np.sum(mass * mass))
+            score = float(eig) + 0.20 * ec2 + 0.025 * float(self.pi[gi])
+            if gi in self.guessed:
+                score -= 0.025
+            if gi == int(top):
+                score -= 0.015
+            if score > best_score:
+                best_score = score
+                best_idx = gi
+        return int(best_idx)
+
     def _endgame_discriminator(self, top: int, k: int = 96) -> int:
         """Pick a probe that separates the current posterior head cluster.
 
@@ -658,42 +1156,25 @@ class NoisyWordleSolver:
         scorer ignores the tiny posterior tail and maximizes entropy only on the
         top candidate cluster, which is what matters in the long-tail cases.
         """
-        k = min(max(8, k), self.N)
-        head = np.argpartition(self.pi, -k)[-k:].astype(np.int32)
-        head_w = self.pi[head].astype(np.float64)
-        sw = float(np.sum(head_w))
-        if sw <= 0.0:
-            return int(top)
-        head_w /= sw
-        pool = self.choose_pool()
-        if int(top) not in set(map(int, pool)):
-            pool = np.concatenate([pool, np.array([int(top)], dtype=np.int32)])
-        best_score = -1e100
-        best_idx = int(top)
-        for gi0 in pool:
-            gi = int(gi0)
-            row = self.row(gi)[head]
-            mass = np.bincount(row, weights=head_w, minlength=N_PATTERNS).astype(np.float64)
-            score = entropy_from_mass(mass)
-            # When close to submitting, prefer actual answer candidates in the
-            # posterior head; otherwise use globally good probes if they split
-            # the head cluster better.
-            score += 0.04 * float(self.pi[gi])
-            if gi == int(top):
-                score -= 0.06
-            if gi in self.guessed:
-                score -= 0.02
-            if score > best_score:
-                best_score = score
-                best_idx = gi
-        return int(best_idx)
+        # Previous versions used posterior-weighted entropy.  That nearly
+        # ignores a rank-2 near-neighbour once p(top) is around 0.99.  Tempered
+        # deterministic EJS keeps those runner-ups visible and tends to select a
+        # probe that separates top-vs-rest rather than merely broad buckets.
+        _, pmax, _, _ = posterior_stats(self.pi)
+        gamma = 0.35 if pmax >= 0.90 else 0.55
+        return self._head_ejs_discriminator(int(top), k=k, gamma=gamma)
 
     def choose_guess(self, turn: int) -> int:
         # Fixed robust opening for the guaranteed early-noise region.  If a fixed
         # word is absent from the candidate list, prefix_indices already falls back
         # to high-coverage candidate words.
         top, pmax, _, _ = posterior_stats(self.pi)
-        if turn <= 3 and turn <= len(self.prefix_indices) and pmax < 0.98:
+        if self.next_forced_probe_idx is not None and turn > 3:
+            gi = int(self.next_forced_probe_idx)
+            self.next_forced_probe_idx = None
+            if 0 <= gi < self.N:
+                return gi
+        if ((self.track == 1 and turn <= 1) or (self.track != 1 and turn <= 3)) and turn <= len(self.prefix_indices) and pmax < 0.98:
             gi = int(self.prefix_indices[turn - 1])
             return gi
         # Endgame under T3: two direct top queries are useful for safety, but
@@ -708,19 +1189,37 @@ class NoisyWordleSolver:
                 # the same word.  First try a high-posterior runner-up direct
                 # probe; this specifically cuts cases like footy/zooty/lofty
                 # where the true answer sits at rank 2-5 for several turns.
-                alt = self._alternate_head_probe(int(top), k=14)
+                alt = self._alternate_head_probe(int(top), k=22 if self.hard_candidate_mode else 14)
                 if alt is not None and (pmax < 0.995 or consecutive_top >= 2):
                     return int(alt)
-                if pmax >= 0.985:
-                    return self._endgame_discriminator(int(top), k=96)
+                if pmax >= (0.975 if self.hard_candidate_mode else 0.985):
+                    return self._endgame_discriminator(int(top), k=160 if self.hard_candidate_mode else 96)
             if direct_top < 2 and (pmax >= 0.72 or (pmax >= 0.42 and recent_top < 2)):
                 return int(top)
             if pmax >= 0.55 and recent_top >= 2:
-                alt = self._alternate_head_probe(int(top), k=10)
+                alt = self._alternate_head_probe(int(top), k=18 if self.hard_candidate_mode else 10)
                 if alt is not None:
                     return int(alt)
+                return self._endgame_discriminator(int(top), k=192 if self.hard_candidate_mode else 128)
+        if self.hard_candidate_mode and self.track == 2 and turn >= 5:
+            direct_top, recent_top, consecutive_top = self._top_history_counts(int(top))
+            if pmax >= 0.88 and direct_top < 2:
+                return int(top)
+            if pmax >= 0.74 and recent_top >= 1:
+                alt = self._alternate_head_probe(int(top), k=20)
+                if alt is not None and (pmax < 0.97 or consecutive_top >= 2):
+                    return int(alt)
                 return self._endgame_discriminator(int(top), k=128)
+            if pmax >= 0.55 and len(self.history) >= 4:
+                return self._endgame_discriminator(int(top), k=160)
+
+        if self.track == 2 and turn >= 4 and 0.22 <= pmax < 0.40:
+            return self._sampled_noisy_eig_discriminator(int(top), k=20 if not self.hard_candidate_mode else 28, pool_limit=72 if not self.hard_candidate_mode else 96, gamma=0.65)
+
         if self.track == 2 and pmax >= 0.82:
+            # Before submitting T2 near-neighbour cases, maybe_submit() may set a
+            # forced probe.  If not, one extra top query is still the fastest way
+            # to calibrate a high posterior.
             return int(top)
 
         pool = self.choose_pool()
@@ -794,9 +1293,10 @@ class Handler(BaseHTTPRequestHandler):
                 pid = str(data.get("problem_id", "default"))
                 solver = SOLVERS.get(pid)
                 if solver is None:
-                    # Fallback for malformed order: create a one-word dummy would be
-                    # invalid, so return a JSON error instead of crashing.
-                    self._write_json({"action": "submit", "word": "error"}, status=200)
+                    # Unknown problem_id is a protocol error.  Returning a fake
+                    # candidate word such as "error" would itself be an invalid
+                    # action under the grader's candidate-list rule.
+                    self._write_json({"error": "unknown_problem_id"}, status=404)
                     return
                 turn = int(data.get("turn", len(solver.history) + 1) or 1)
                 action = solver.act(turn, data.get("feedback"))
