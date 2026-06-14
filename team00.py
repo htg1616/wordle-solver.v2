@@ -9,7 +9,10 @@ algorithm handoff, but modified for the actual grading protocol:
   * feedback rows are built lazily and cached;
   * the first-three-turn forced-noise rule is handled as an exact joint schedule;
   * Tracks 2/3 use exact collapsed one-/two-letter mutation likelihoods rather
-    than a precomputed empirical confusion matrix.
+    than a precomputed empirical confusion matrix;
+  * merged safety/speed patch: keeps the safer hard-candidate detector and
+    submit guards from version 1, while adding the wider T2 noisy-EIG probing
+    and adaptive stability window inspired by version 2.
 
 Run with:
     python team00.py
@@ -292,8 +295,8 @@ class NoisyWordleSolver:
                 static_pool_size=self._adapt_pool(384 if self.hard_candidate_mode else 256),
                 top_post_pool_size=min(288 if self.hard_candidate_mode else 160, self.N),
                 min_submit_turn=6 if not self.hard_candidate_mode else 5,
-                threshold=0.996 if self.hard_candidate_mode else 0.9965,
-                odds_threshold=800.0 if self.hard_candidate_mode else 650.0,
+                threshold=0.996 if self.hard_candidate_mode else 0.9960,
+                odds_threshold=800.0 if self.hard_candidate_mode else 500.0,
                 topk_confirm=(min(self.N, 256) if self.hard_candidate_mode else min(64, self.N)),
                 topk_mass_min=0.96 if self.hard_candidate_mode else 0.92, retry_gap=1 if self.hard_candidate_mode else 2,
                 force_submit_turn=min(70, max_submit_turn), alpha=1.0, mix_epsilon=1e-10,
@@ -307,8 +310,8 @@ class NoisyWordleSolver:
             pool_size=self._adapt_pool(672 if self.hard_candidate_mode else 448),
             static_pool_size=self._adapt_pool(384 if self.hard_candidate_mode else 224),
             top_post_pool_size=min(384 if self.hard_candidate_mode else 288, self.N),
-            min_submit_turn=5, threshold=0.988 if self.hard_candidate_mode else 0.985,
-            odds_threshold=180.0 if self.hard_candidate_mode else 120.0,
+            min_submit_turn=5, threshold=0.988 if self.hard_candidate_mode else 0.982,
+            odds_threshold=180.0 if self.hard_candidate_mode else 90.0,
             topk_confirm=(min(self.N, 384) if self.hard_candidate_mode else min(96, self.N)),
             topk_mass_min=0.94 if self.hard_candidate_mode else 0.88, retry_gap=1 if self.hard_candidate_mode else 2,
             force_submit_turn=min(60, max_submit_turn), alpha=0.95, mix_epsilon=1e-10,
@@ -715,6 +718,33 @@ class NoisyWordleSolver:
             return self._head_ejs_discriminator(int(top), k=min(128, max(32, len(topk))), gamma=0.0, cluster=cluster)
         return int(top)
 
+    def _submit_stability_until(self, exact_pmax: float, exact_odds: float, close_count: int) -> int:
+        """Return the turn until which leave-one-out submit checks are required.
+
+        Version 1 used long non-hard windows, which is safe but can delay easy
+        full-dictionary games.  Version 2 used short windows, which is faster but
+        risky for close clusters.  This merged rule is adaptive: keep the long
+        window for hard lists or ambiguous close clusters, but shorten it when
+        the exact top-K replay is already overwhelmingly decisive.
+        """
+        if close_count <= 0:
+            return 0
+        if self.hard_candidate_mode:
+            return 30 if self.track == 2 else 40
+        if self.track == 2:
+            if close_count <= 1 and exact_pmax >= 0.9993 and exact_odds >= 2500.0:
+                return 12
+            if close_count <= 2 and exact_pmax >= 0.9987 and exact_odds >= 1500.0:
+                return 16
+            return 22
+        if self.track == 3:
+            if close_count <= 1 and exact_pmax >= 0.9990 and exact_odds >= 900.0:
+                return 16
+            if close_count <= 2 and exact_pmax >= 0.9982 and exact_odds >= 550.0:
+                return 22
+            return 30
+        return 0
+
     def _full_exact_topk_confirmation(self, topk: np.ndarray, approx_top: int, turn: int) -> dict:
         """Replay exact posterior on top-K and apply conservative submit safety gates."""
         K = int(len(topk))
@@ -803,8 +833,8 @@ class NoisyWordleSolver:
             # evidence changes the winner to a close competitor, the posterior is
             # still brittle, so ask that competitor/top once more instead of
             # risking a 100-turn wrong submit.
-            stable_until = (30 if self.track == 2 else 40) if self.hard_candidate_mode else (22 if self.track == 2 else 30)
-            if turn < stable_until:
+            stable_until = self._submit_stability_until(exact_pmax, exact_odds, len(close))
+            if stable_until > 0 and turn < stable_until:
                 start = max(0, len(self.likelihood_history) - 8)
                 for hist_i in range(start, len(self.likelihood_history)):
                     loo = self._replay_exact_topk(topk, skip_history_index=hist_i)
@@ -1247,8 +1277,18 @@ class NoisyWordleSolver:
             if pmax >= 0.55 and len(self.history) >= 4:
                 return self._endgame_discriminator(int(top), k=160)
 
-        if self.track == 2 and turn >= 4 and 0.22 <= pmax < 0.40:
-            return self._sampled_noisy_eig_discriminator(int(top), k=20 if not self.hard_candidate_mode else 28, pool_limit=72 if not self.hard_candidate_mode else 96, gamma=0.65)
+        # Version 2's useful speed idea was to run the sampled noisy-EIG
+        # discriminator over a wider T2 uncertainty band.  Keep that benefit,
+        # but reduce the pool in the very low-confidence part so the full
+        # dictionary remains fast and avoid overusing it once direct top probing
+        # becomes better.
+        if self.track == 2 and turn >= 4:
+            if self.hard_candidate_mode and 0.10 <= pmax < 0.60:
+                return self._sampled_noisy_eig_discriminator(int(top), k=28, pool_limit=96, gamma=0.65)
+            if (not self.hard_candidate_mode) and 0.10 <= pmax < 0.55:
+                if pmax < 0.22:
+                    return self._sampled_noisy_eig_discriminator(int(top), k=18, pool_limit=56, gamma=0.70)
+                return self._sampled_noisy_eig_discriminator(int(top), k=20, pool_limit=72, gamma=0.65)
 
         if self.track == 2 and pmax >= 0.82:
             # Before submitting T2 near-neighbour cases, maybe_submit() may set a
