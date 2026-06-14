@@ -1141,11 +1141,11 @@ class NoisyWordleSolver:
         top_pool = np.argpartition(self.pi, -min(self.N, max(32, pool_limit // 2)))[-min(self.N, max(32, pool_limit // 2)):].astype(np.int32)
         static_keep = self.static_pool[:min(len(self.static_pool), max(16, pool_limit // 2))].astype(np.int32)
         pool = np.unique(np.concatenate([pool.astype(np.int32), top_pool, static_keep, head.astype(np.int32), np.array([int(top)], dtype=np.int32)]))
-        if len(당구) > pool_limit:
+        if len(pool) > pool_limit:
             # Score candidates cheaply for truncation: keep high-posterior answer candidates and static probes.
             bonus = self.pi[pool].astype(np.float64)
             static_set = set(int(x) for x in static_keep)
-            for j, gi in enumerate(당구):
+            for j, gi in enumerate(pool):
                 if int(gi) in static_set:
                     bonus[j] += 0.02
             pool = pool[np.argsort(bonus)[-int(pool_limit):]].astype(np.int32)
