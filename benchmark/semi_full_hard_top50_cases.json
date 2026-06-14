@@ -1,0 +1,1423 @@
+{
+  "metadata": {
+    "description": "Cases selected from the uploaded full-benchmark-merged results: every slow case (score_turns > threshold) plus every failed case. Candidate words can be loaded from words_from_full_benchmark.txt. Top-50 smoke subset.",
+    "source_zip": "full-benchmark-merged (1).zip",
+    "slow_threshold_turns": 15,
+    "summary": {
+      "games": 38916,
+      "solved": 38887,
+      "failed": 29,
+      "success_rate": 0.999255,
+      "slow_words_count": 1575,
+      "failed_words_count": 29
+    },
+    "candidate_words_count": 12972,
+    "case_count": 50,
+    "failed_case_count": 29,
+    "slow_case_count": 1635,
+    "tracks": [
+      2,
+      3
+    ],
+    "seeds": [
+      0
+    ]
+  },
+  "cases": [
+    {
+      "secret": "hewer",
+      "track": 3,
+      "seed": 0,
+      "reasons": [
+        "slow",
+        "failed"
+      ],
+      "original": {
+        "slow_status": "wrong_submit",
+        "slow_score_turns": 100,
+        "slow_turns": 16,
+        "slow_act_wall_s": "11.518923",
+        "slow_success": false,
+        "max_score_turns": 100,
+        "failed_status": "wrong_submit",
+        "failed_score_turns": 100,
+        "failed_turns": 16,
+        "failed_act_wall_s": "11.518923",
+        "full_status": "wrong_submit",
+        "full_success": 0,
+        "full_score_turns": 100,
+        "full_turns": 16,
+        "full_guesses": 15,
+        "full_submits": 1,
+        "full_act_wall_s": "11.518923",
+        "full_last_action": "submit",
+        "full_last_word": "fewer"
+      }
+    },
+    {
+      "secret": "woofy",
+      "track": 3,
+      "seed": 0,
+      "reasons": [
+        "slow",
+        "failed"
+      ],
+      "original": {
+        "slow_status": "wrong_submit",
+        "slow_score_turns": 100,
+        "slow_turns": 16,
+        "slow_act_wall_s": "11.489504",
+        "slow_success": false,
+        "max_score_turns": 100,
+        "failed_status": "wrong_submit",
+        "failed_score_turns": 100,
+        "failed_turns": 16,
+        "failed_act_wall_s": "11.489504",
+        "full_status": "wrong_submit",
+        "full_success": 0,
+        "full_score_turns": 100,
+        "full_turns": 16,
+        "full_guesses": 15,
+        "full_submits": 1,
+        "full_act_wall_s": "11.489504",
+        "full_last_action": "submit",
+        "full_last_word": "doozy"
+      }
+    },
+    {
+      "secret": "balky",
+      "track": 3,
+      "seed": 0,
+      "reasons": [
+        "slow",
+        "failed"
+      ],
+      "original": {
+        "slow_status": "wrong_submit",
+        "slow_score_turns": 100,
+        "slow_turns": 14,
+        "slow_act_wall_s": "10.704771",
+        "slow_success": false,
+        "max_score_turns": 100,
+        "failed_status": "wrong_submit",
+        "failed_score_turns": 100,
+        "failed_turns": 14,
+        "failed_act_wall_s": "10.704771",
+        "full_status": "wrong_submit",
+        "full_success": 0,
+        "full_score_turns": 100,
+        "full_turns": 14,
+        "full_guesses": 13,
+        "full_submits": 1,
+        "full_act_wall_s": "10.704771",
+        "full_last_action": "submit",
+        "full_last_word": "talky"
+      }
+    },
+    {
+      "secret": "spine",
+      "track": 3,
+      "seed": 0,
+      "reasons": [
+        "slow",
+        "failed"
+      ],
+      "original": {
+        "slow_status": "wrong_submit",
+        "slow_score_turns": 100,
+        "slow_turns": 14,
+        "slow_act_wall_s": "12.353510",
+        "slow_success": false,
+        "max_score_turns": 100,
+        "failed_status": "wrong_submit",
+        "failed_score_turns": 100,
+        "failed_turns": 14,
+        "failed_act_wall_s": "12.353510",
+        "full_status": "wrong_submit",
+        "full_success": 0,
+        "full_score_turns": 100,
+        "full_turns": 14,
+        "full_guesses": 13,
+        "full_submits": 1,
+        "full_act_wall_s": "12.353510",
+        "full_last_action": "submit",
+        "full_last_word": "shine"
+      }
+    },
+    {
+      "secret": "probs",
+      "track": 3,
+      "seed": 0,
+      "reasons": [
+        "slow",
+        "failed"
+      ],
+      "original": {
+        "slow_status": "wrong_submit",
+        "slow_score_turns": 100,
+        "slow_turns": 13,
+        "slow_act_wall_s": "10.539287",
+        "slow_success": false,
+        "max_score_turns": 100,
+        "failed_status": "wrong_submit",
+        "failed_score_turns": 100,
+        "failed_turns": 13,
+        "failed_act_wall_s": "10.539287",
+        "full_status": "wrong_submit",
+        "full_success": 0,
+        "full_score_turns": 100,
+        "full_turns": 13,
+        "full_guesses": 12,
+        "full_submits": 1,
+        "full_act_wall_s": "10.539287",
+        "full_last_action": "submit",
+        "full_last_word": "pross"
+      }
+    },
+    {
+      "secret": "gobis",
+      "track": 2,
+      "seed": 0,
+      "reasons": [
+        "slow",
+        "failed"
+      ],
+      "original": {
+        "slow_status": "wrong_submit",
+        "slow_score_turns": 100,
+        "slow_turns": 13,
+        "slow_act_wall_s": "10.585098",
+        "slow_success": false,
+        "max_score_turns": 100,
+        "failed_status": "wrong_submit",
+        "failed_score_turns": 100,
+        "failed_turns": 13,
+        "failed_act_wall_s": "10.585098",
+        "full_status": "wrong_submit",
+        "full_success": 0,
+        "full_score_turns": 100,
+        "full_turns": 13,
+        "full_guesses": 12,
+        "full_submits": 1,
+        "full_act_wall_s": "10.585098",
+        "full_last_action": "submit",
+        "full_last_word": "goris"
+      }
+    },
+    {
+      "secret": "piggy",
+      "track": 2,
+      "seed": 0,
+      "reasons": [
+        "slow",
+        "failed"
+      ],
+      "original": {
+        "slow_status": "wrong_submit",
+        "slow_score_turns": 100,
+        "slow_turns": 13,
+        "slow_act_wall_s": "8.902192",
+        "slow_success": false,
+        "max_score_turns": 100,
+        "failed_status": "wrong_submit",
+        "failed_score_turns": 100,
+        "failed_turns": 13,
+        "failed_act_wall_s": "8.902192",
+        "full_status": "wrong_submit",
+        "full_success": 0,
+        "full_score_turns": 100,
+        "full_turns": 13,
+        "full_guesses": 12,
+        "full_submits": 1,
+        "full_act_wall_s": "8.902192",
+        "full_last_action": "submit",
+        "full_last_word": "jiggy"
+      }
+    },
+    {
+      "secret": "ensky",
+      "track": 3,
+      "seed": 0,
+      "reasons": [
+        "slow",
+        "failed"
+      ],
+      "original": {
+        "slow_status": "wrong_submit",
+        "slow_score_turns": 100,
+        "slow_turns": 12,
+        "slow_act_wall_s": "10.755953",
+        "slow_success": false,
+        "max_score_turns": 100,
+        "failed_status": "wrong_submit",
+        "failed_score_turns": 100,
+        "failed_turns": 12,
+        "failed_act_wall_s": "10.755953",
+        "full_status": "wrong_submit",
+        "full_success": 0,
+        "full_score_turns": 100,
+        "full_turns": 12,
+        "full_guesses": 11,
+        "full_submits": 1,
+        "full_act_wall_s": "10.755953",
+        "full_last_action": "submit",
+        "full_last_word": "enorm"
+      }
+    },
+    {
+      "secret": "decry",
+      "track": 3,
+      "seed": 0,
+      "reasons": [
+        "slow",
+        "failed"
+      ],
+      "original": {
+        "slow_status": "wrong_submit",
+        "slow_score_turns": 100,
+        "slow_turns": 11,
+        "slow_act_wall_s": "9.639309",
+        "slow_success": false,
+        "max_score_turns": 100,
+        "failed_status": "wrong_submit",
+        "failed_score_turns": 100,
+        "failed_turns": 11,
+        "failed_act_wall_s": "9.639309",
+        "full_status": "wrong_submit",
+        "full_success": 0,
+        "full_score_turns": 100,
+        "full_turns": 11,
+        "full_guesses": 10,
+        "full_submits": 1,
+        "full_act_wall_s": "9.639309",
+        "full_last_action": "submit",
+        "full_last_word": "decay"
+      }
+    },
+    {
+      "secret": "horst",
+      "track": 3,
+      "seed": 0,
+      "reasons": [
+        "slow",
+        "failed"
+      ],
+      "original": {
+        "slow_status": "wrong_submit",
+        "slow_score_turns": 100,
+        "slow_turns": 11,
+        "slow_act_wall_s": "9.324342",
+        "slow_success": false,
+        "max_score_turns": 100,
+        "failed_status": "wrong_submit",
+        "failed_score_turns": 100,
+        "failed_turns": 11,
+        "failed_act_wall_s": "9.324342",
+        "full_status": "wrong_submit",
+        "full_success": 0,
+        "full_score_turns": 100,
+        "full_turns": 11,
+        "full_guesses": 10,
+        "full_submits": 1,
+        "full_act_wall_s": "9.324342",
+        "full_last_action": "submit",
+        "full_last_word": "worst"
+      }
+    },
+    {
+      "secret": "elude",
+      "track": 2,
+      "seed": 0,
+      "reasons": [
+        "slow",
+        "failed"
+      ],
+      "original": {
+        "slow_status": "wrong_submit",
+        "slow_score_turns": 100,
+        "slow_turns": 11,
+        "slow_act_wall_s": "7.442200",
+        "slow_success": false,
+        "max_score_turns": 100,
+        "failed_status": "wrong_submit",
+        "failed_score_turns": 100,
+        "failed_turns": 11,
+        "failed_act_wall_s": "7.442200",
+        "full_status": "wrong_submit",
+        "full_success": 0,
+        "full_score_turns": 100,
+        "full_turns": 11,
+        "full_guesses": 10,
+        "full_submits": 1,
+        "full_act_wall_s": "7.442200",
+        "full_last_action": "submit",
+        "full_last_word": "elute"
+      }
+    },
+    {
+      "secret": "meses",
+      "track": 2,
+      "seed": 0,
+      "reasons": [
+        "slow",
+        "failed"
+      ],
+      "original": {
+        "slow_status": "wrong_submit",
+        "slow_score_turns": 100,
+        "slow_turns": 11,
+        "slow_act_wall_s": "6.805059",
+        "slow_success": false,
+        "max_score_turns": 100,
+        "failed_status": "wrong_submit",
+        "failed_score_turns": 100,
+        "failed_turns": 11,
+        "failed_act_wall_s": "6.805059",
+        "full_status": "wrong_submit",
+        "full_success": 0,
+        "full_score_turns": 100,
+        "full_turns": 11,
+        "full_guesses": 10,
+        "full_submits": 1,
+        "full_act_wall_s": "6.805059",
+        "full_last_action": "submit",
+        "full_last_word": "yeses"
+      }
+    },
+    {
+      "secret": "boeps",
+      "track": 3,
+      "seed": 0,
+      "reasons": [
+        "slow",
+        "failed"
+      ],
+      "original": {
+        "slow_status": "wrong_submit",
+        "slow_score_turns": 100,
+        "slow_turns": 10,
+        "slow_act_wall_s": "8.842441",
+        "slow_success": false,
+        "max_score_turns": 100,
+        "failed_status": "wrong_submit",
+        "failed_score_turns": 100,
+        "failed_turns": 10,
+        "failed_act_wall_s": "8.842441",
+        "full_status": "wrong_submit",
+        "full_success": 0,
+        "full_score_turns": 100,
+        "full_turns": 10,
+        "full_guesses": 9,
+        "full_submits": 1,
+        "full_act_wall_s": "8.842441",
+        "full_last_action": "submit",
+        "full_last_word": "koels"
+      }
+    },
+    {
+      "secret": "bydes",
+      "track": 3,
+      "seed": 0,
+      "reasons": [
+        "slow",
+        "failed"
+      ],
+      "original": {
+        "slow_status": "wrong_submit",
+        "slow_score_turns": 100,
+        "slow_turns": 10,
+        "slow_act_wall_s": "9.193675",
+        "slow_success": false,
+        "max_score_turns": 100,
+        "failed_status": "wrong_submit",
+        "failed_score_turns": 100,
+        "failed_turns": 10,
+        "failed_act_wall_s": "9.193675",
+        "full_status": "wrong_submit",
+        "full_success": 0,
+        "full_score_turns": 100,
+        "full_turns": 10,
+        "full_guesses": 9,
+        "full_submits": 1,
+        "full_act_wall_s": "9.193675",
+        "full_last_action": "submit",
+        "full_last_word": "byres"
+      }
+    },
+    {
+      "secret": "hurra",
+      "track": 3,
+      "seed": 0,
+      "reasons": [
+        "slow",
+        "failed"
+      ],
+      "original": {
+        "slow_status": "wrong_submit",
+        "slow_score_turns": 100,
+        "slow_turns": 10,
+        "slow_act_wall_s": "6.854263",
+        "slow_success": false,
+        "max_score_turns": 100,
+        "failed_status": "wrong_submit",
+        "failed_score_turns": 100,
+        "failed_turns": 10,
+        "failed_act_wall_s": "6.854263",
+        "full_status": "wrong_submit",
+        "full_success": 0,
+        "full_score_turns": 100,
+        "full_turns": 10,
+        "full_guesses": 9,
+        "full_submits": 1,
+        "full_act_wall_s": "6.854263",
+        "full_last_action": "submit",
+        "full_last_word": "murra"
+      }
+    },
+    {
+      "secret": "sumps",
+      "track": 3,
+      "seed": 0,
+      "reasons": [
+        "slow",
+        "failed"
+      ],
+      "original": {
+        "slow_status": "wrong_submit",
+        "slow_score_turns": 100,
+        "slow_turns": 10,
+        "slow_act_wall_s": "8.806327",
+        "slow_success": false,
+        "max_score_turns": 100,
+        "failed_status": "wrong_submit",
+        "failed_score_turns": 100,
+        "failed_turns": 10,
+        "failed_act_wall_s": "8.806327",
+        "full_status": "wrong_submit",
+        "full_success": 0,
+        "full_score_turns": 100,
+        "full_turns": 10,
+        "full_guesses": 9,
+        "full_submits": 1,
+        "full_act_wall_s": "8.806327",
+        "full_last_action": "submit",
+        "full_last_word": "sumph"
+      }
+    },
+    {
+      "secret": "gazed",
+      "track": 3,
+      "seed": 0,
+      "reasons": [
+        "slow",
+        "failed"
+      ],
+      "original": {
+        "slow_status": "wrong_submit",
+        "slow_score_turns": 100,
+        "slow_turns": 9,
+        "slow_act_wall_s": "7.935686",
+        "slow_success": false,
+        "max_score_turns": 100,
+        "failed_status": "wrong_submit",
+        "failed_score_turns": 100,
+        "failed_turns": 9,
+        "failed_act_wall_s": "7.935686",
+        "full_status": "wrong_submit",
+        "full_success": 0,
+        "full_score_turns": 100,
+        "full_turns": 9,
+        "full_guesses": 8,
+        "full_submits": 1,
+        "full_act_wall_s": "7.935686",
+        "full_last_action": "submit",
+        "full_last_word": "gamed"
+      }
+    },
+    {
+      "secret": "messy",
+      "track": 3,
+      "seed": 0,
+      "reasons": [
+        "slow",
+        "failed"
+      ],
+      "original": {
+        "slow_status": "wrong_submit",
+        "slow_score_turns": 100,
+        "slow_turns": 9,
+        "slow_act_wall_s": "7.427538",
+        "slow_success": false,
+        "max_score_turns": 100,
+        "failed_status": "wrong_submit",
+        "failed_score_turns": 100,
+        "failed_turns": 9,
+        "failed_act_wall_s": "7.427538",
+        "full_status": "wrong_submit",
+        "full_success": 0,
+        "full_score_turns": 100,
+        "full_turns": 9,
+        "full_guesses": 8,
+        "full_submits": 1,
+        "full_act_wall_s": "7.427538",
+        "full_last_action": "submit",
+        "full_last_word": "gesso"
+      }
+    },
+    {
+      "secret": "duits",
+      "track": 3,
+      "seed": 0,
+      "reasons": [
+        "slow",
+        "failed"
+      ],
+      "original": {
+        "slow_status": "wrong_submit",
+        "slow_score_turns": 100,
+        "slow_turns": 8,
+        "slow_act_wall_s": "5.553125",
+        "slow_success": false,
+        "max_score_turns": 100,
+        "failed_status": "wrong_submit",
+        "failed_score_turns": 100,
+        "failed_turns": 8,
+        "failed_act_wall_s": "5.553125",
+        "full_status": "wrong_submit",
+        "full_success": 0,
+        "full_score_turns": 100,
+        "full_turns": 8,
+        "full_guesses": 7,
+        "full_submits": 1,
+        "full_act_wall_s": "5.553125",
+        "full_last_action": "submit",
+        "full_last_word": "dusts"
+      }
+    },
+    {
+      "secret": "livid",
+      "track": 3,
+      "seed": 0,
+      "reasons": [
+        "slow",
+        "failed"
+      ],
+      "original": {
+        "slow_status": "wrong_submit",
+        "slow_score_turns": 100,
+        "slow_turns": 8,
+        "slow_act_wall_s": "6.425910",
+        "slow_success": false,
+        "max_score_turns": 100,
+        "failed_status": "wrong_submit",
+        "failed_score_turns": 100,
+        "failed_turns": 8,
+        "failed_act_wall_s": "6.425910",
+        "full_status": "wrong_submit",
+        "full_success": 0,
+        "full_score_turns": 100,
+        "full_turns": 8,
+        "full_guesses": 7,
+        "full_submits": 1,
+        "full_act_wall_s": "6.425910",
+        "full_last_action": "submit",
+        "full_last_word": "lipid"
+      }
+    },
+    {
+      "secret": "posts",
+      "track": 2,
+      "seed": 0,
+      "reasons": [
+        "slow",
+        "failed"
+      ],
+      "original": {
+        "slow_status": "wrong_submit",
+        "slow_score_turns": 100,
+        "slow_turns": 8,
+        "slow_act_wall_s": "5.868947",
+        "slow_success": false,
+        "max_score_turns": 100,
+        "failed_status": "wrong_submit",
+        "failed_score_turns": 100,
+        "failed_turns": 8,
+        "failed_act_wall_s": "5.868947",
+        "full_status": "wrong_submit",
+        "full_success": 0,
+        "full_score_turns": 100,
+        "full_turns": 8,
+        "full_guesses": 7,
+        "full_submits": 1,
+        "full_act_wall_s": "5.868947",
+        "full_last_action": "submit",
+        "full_last_word": "poses"
+      }
+    },
+    {
+      "secret": "prase",
+      "track": 2,
+      "seed": 0,
+      "reasons": [
+        "slow",
+        "failed"
+      ],
+      "original": {
+        "slow_status": "wrong_submit",
+        "slow_score_turns": 100,
+        "slow_turns": 8,
+        "slow_act_wall_s": "6.222282",
+        "slow_success": false,
+        "max_score_turns": 100,
+        "failed_status": "wrong_submit",
+        "failed_score_turns": 100,
+        "failed_turns": 8,
+        "failed_act_wall_s": "6.222282",
+        "full_status": "wrong_submit",
+        "full_success": 0,
+        "full_score_turns": 100,
+        "full_turns": 8,
+        "full_guesses": 7,
+        "full_submits": 1,
+        "full_act_wall_s": "6.222282",
+        "full_last_action": "submit",
+        "full_last_word": "urase"
+      }
+    },
+    {
+      "secret": "preed",
+      "track": 2,
+      "seed": 0,
+      "reasons": [
+        "slow",
+        "failed"
+      ],
+      "original": {
+        "slow_status": "wrong_submit",
+        "slow_score_turns": 100,
+        "slow_turns": 8,
+        "slow_act_wall_s": "5.745825",
+        "slow_success": false,
+        "max_score_turns": 100,
+        "failed_status": "wrong_submit",
+        "failed_score_turns": 100,
+        "failed_turns": 8,
+        "failed_act_wall_s": "5.745825",
+        "full_status": "wrong_submit",
+        "full_success": 0,
+        "full_score_turns": 100,
+        "full_turns": 8,
+        "full_guesses": 7,
+        "full_submits": 1,
+        "full_act_wall_s": "5.745825",
+        "full_last_action": "submit",
+        "full_last_word": "pried"
+      }
+    },
+    {
+      "secret": "plain",
+      "track": 3,
+      "seed": 0,
+      "reasons": [
+        "slow",
+        "failed"
+      ],
+      "original": {
+        "slow_status": "wrong_submit",
+        "slow_score_turns": 100,
+        "slow_turns": 7,
+        "slow_act_wall_s": "6.006351",
+        "slow_success": false,
+        "max_score_turns": 100,
+        "failed_status": "wrong_submit",
+        "failed_score_turns": 100,
+        "failed_turns": 7,
+        "failed_act_wall_s": "6.006351",
+        "full_status": "wrong_submit",
+        "full_success": 0,
+        "full_score_turns": 100,
+        "full_turns": 7,
+        "full_guesses": 6,
+        "full_submits": 1,
+        "full_act_wall_s": "6.006351",
+        "full_last_action": "submit",
+        "full_last_word": "aloin"
+      }
+    },
+    {
+      "secret": "drone",
+      "track": 2,
+      "seed": 0,
+      "reasons": [
+        "slow",
+        "failed"
+      ],
+      "original": {
+        "slow_status": "wrong_submit",
+        "slow_score_turns": 100,
+        "slow_turns": 7,
+        "slow_act_wall_s": "5.022326",
+        "slow_success": false,
+        "max_score_turns": 100,
+        "failed_status": "wrong_submit",
+        "failed_score_turns": 100,
+        "failed_turns": 7,
+        "failed_act_wall_s": "5.022326",
+        "full_status": "wrong_submit",
+        "full_success": 0,
+        "full_score_turns": 100,
+        "full_turns": 7,
+        "full_guesses": 6,
+        "full_submits": 1,
+        "full_act_wall_s": "5.022326",
+        "full_last_action": "submit",
+        "full_last_word": "drent"
+      }
+    },
+    {
+      "secret": "hashy",
+      "track": 2,
+      "seed": 0,
+      "reasons": [
+        "slow",
+        "failed"
+      ],
+      "original": {
+        "slow_status": "wrong_submit",
+        "slow_score_turns": 100,
+        "slow_turns": 7,
+        "slow_act_wall_s": "5.375429",
+        "slow_success": false,
+        "max_score_turns": 100,
+        "failed_status": "wrong_submit",
+        "failed_score_turns": 100,
+        "failed_turns": 7,
+        "failed_act_wall_s": "5.375429",
+        "full_status": "wrong_submit",
+        "full_success": 0,
+        "full_score_turns": 100,
+        "full_turns": 7,
+        "full_guesses": 6,
+        "full_submits": 1,
+        "full_act_wall_s": "5.375429",
+        "full_last_action": "submit",
+        "full_last_word": "mashy"
+      }
+    },
+    {
+      "secret": "inker",
+      "track": 2,
+      "seed": 0,
+      "reasons": [
+        "slow",
+        "failed"
+      ],
+      "original": {
+        "slow_status": "wrong_submit",
+        "slow_score_turns": 100,
+        "slow_turns": 6,
+        "slow_act_wall_s": "3.795050",
+        "slow_success": false,
+        "max_score_turns": 100,
+        "failed_status": "wrong_submit",
+        "failed_score_turns": 100,
+        "failed_turns": 6,
+        "failed_act_wall_s": "3.795050",
+        "full_status": "wrong_submit",
+        "full_success": 0,
+        "full_score_turns": 100,
+        "full_turns": 6,
+        "full_guesses": 5,
+        "full_submits": 1,
+        "full_act_wall_s": "3.795050",
+        "full_last_action": "submit",
+        "full_last_word": "inner"
+      }
+    },
+    {
+      "secret": "unrid",
+      "track": 2,
+      "seed": 0,
+      "reasons": [
+        "slow",
+        "failed"
+      ],
+      "original": {
+        "slow_status": "wrong_submit",
+        "slow_score_turns": 100,
+        "slow_turns": 6,
+        "slow_act_wall_s": "4.089006",
+        "slow_success": false,
+        "max_score_turns": 100,
+        "failed_status": "wrong_submit",
+        "failed_score_turns": 100,
+        "failed_turns": 6,
+        "failed_act_wall_s": "4.089006",
+        "full_status": "wrong_submit",
+        "full_success": 0,
+        "full_score_turns": 100,
+        "full_turns": 6,
+        "full_guesses": 5,
+        "full_submits": 1,
+        "full_act_wall_s": "4.089006",
+        "full_last_action": "submit",
+        "full_last_word": "unrip"
+      }
+    },
+    {
+      "secret": "bonie",
+      "track": 2,
+      "seed": 0,
+      "reasons": [
+        "slow",
+        "failed"
+      ],
+      "original": {
+        "slow_status": "wrong_submit",
+        "slow_score_turns": 100,
+        "slow_turns": 5,
+        "slow_act_wall_s": "3.548745",
+        "slow_success": false,
+        "max_score_turns": 100,
+        "failed_status": "wrong_submit",
+        "failed_score_turns": 100,
+        "failed_turns": 5,
+        "failed_act_wall_s": "3.548745",
+        "full_status": "wrong_submit",
+        "full_success": 0,
+        "full_score_turns": 100,
+        "full_turns": 5,
+        "full_guesses": 4,
+        "full_submits": 1,
+        "full_act_wall_s": "3.548745",
+        "full_last_action": "submit",
+        "full_last_word": "benis"
+      }
+    },
+    {
+      "secret": "lumps",
+      "track": 3,
+      "seed": 0,
+      "reasons": [
+        "slow"
+      ],
+      "original": {
+        "slow_status": "solved",
+        "slow_score_turns": 40,
+        "slow_turns": 40,
+        "slow_act_wall_s": "29.294196",
+        "slow_success": true,
+        "max_score_turns": 40,
+        "full_status": "solved",
+        "full_success": 1,
+        "full_score_turns": 40,
+        "full_turns": 40,
+        "full_guesses": 39,
+        "full_submits": 1,
+        "full_act_wall_s": "29.294196",
+        "full_last_action": "submit",
+        "full_last_word": "lumps"
+      }
+    },
+    {
+      "secret": "nowed",
+      "track": 3,
+      "seed": 0,
+      "reasons": [
+        "slow"
+      ],
+      "original": {
+        "slow_status": "solved",
+        "slow_score_turns": 35,
+        "slow_turns": 35,
+        "slow_act_wall_s": "31.796187",
+        "slow_success": true,
+        "max_score_turns": 35,
+        "full_status": "solved",
+        "full_success": 1,
+        "full_score_turns": 35,
+        "full_turns": 35,
+        "full_guesses": 34,
+        "full_submits": 1,
+        "full_act_wall_s": "31.796187",
+        "full_last_action": "submit",
+        "full_last_word": "nowed"
+      }
+    },
+    {
+      "secret": "porks",
+      "track": 3,
+      "seed": 0,
+      "reasons": [
+        "slow"
+      ],
+      "original": {
+        "slow_status": "solved",
+        "slow_score_turns": 35,
+        "slow_turns": 35,
+        "slow_act_wall_s": "26.913858",
+        "slow_success": true,
+        "max_score_turns": 35,
+        "full_status": "solved",
+        "full_success": 1,
+        "full_score_turns": 35,
+        "full_turns": 35,
+        "full_guesses": 34,
+        "full_submits": 1,
+        "full_act_wall_s": "26.913858",
+        "full_last_action": "submit",
+        "full_last_word": "porks"
+      }
+    },
+    {
+      "secret": "bolls",
+      "track": 3,
+      "seed": 0,
+      "reasons": [
+        "slow"
+      ],
+      "original": {
+        "slow_status": "solved",
+        "slow_score_turns": 34,
+        "slow_turns": 34,
+        "slow_act_wall_s": "23.537740",
+        "slow_success": true,
+        "max_score_turns": 34,
+        "full_status": "solved",
+        "full_success": 1,
+        "full_score_turns": 34,
+        "full_turns": 34,
+        "full_guesses": 33,
+        "full_submits": 1,
+        "full_act_wall_s": "23.537740",
+        "full_last_action": "submit",
+        "full_last_word": "bolls"
+      }
+    },
+    {
+      "secret": "backs",
+      "track": 3,
+      "seed": 0,
+      "reasons": [
+        "slow"
+      ],
+      "original": {
+        "slow_status": "solved",
+        "slow_score_turns": 33,
+        "slow_turns": 33,
+        "slow_act_wall_s": "28.808296",
+        "slow_success": true,
+        "max_score_turns": 33,
+        "full_status": "solved",
+        "full_success": 1,
+        "full_score_turns": 33,
+        "full_turns": 33,
+        "full_guesses": 32,
+        "full_submits": 1,
+        "full_act_wall_s": "28.808296",
+        "full_last_action": "submit",
+        "full_last_word": "backs"
+      }
+    },
+    {
+      "secret": "craws",
+      "track": 3,
+      "seed": 0,
+      "reasons": [
+        "slow"
+      ],
+      "original": {
+        "slow_status": "solved",
+        "slow_score_turns": 33,
+        "slow_turns": 33,
+        "slow_act_wall_s": "29.206587",
+        "slow_success": true,
+        "max_score_turns": 33,
+        "full_status": "solved",
+        "full_success": 1,
+        "full_score_turns": 33,
+        "full_turns": 33,
+        "full_guesses": 32,
+        "full_submits": 1,
+        "full_act_wall_s": "29.206587",
+        "full_last_action": "submit",
+        "full_last_word": "craws"
+      }
+    },
+    {
+      "secret": "dinge",
+      "track": 3,
+      "seed": 0,
+      "reasons": [
+        "slow"
+      ],
+      "original": {
+        "slow_status": "solved",
+        "slow_score_turns": 33,
+        "slow_turns": 33,
+        "slow_act_wall_s": "28.311592",
+        "slow_success": true,
+        "max_score_turns": 33,
+        "full_status": "solved",
+        "full_success": 1,
+        "full_score_turns": 33,
+        "full_turns": 33,
+        "full_guesses": 32,
+        "full_submits": 1,
+        "full_act_wall_s": "28.311592",
+        "full_last_action": "submit",
+        "full_last_word": "dinge"
+      }
+    },
+    {
+      "secret": "mangs",
+      "track": 3,
+      "seed": 0,
+      "reasons": [
+        "slow"
+      ],
+      "original": {
+        "slow_status": "solved",
+        "slow_score_turns": 33,
+        "slow_turns": 33,
+        "slow_act_wall_s": "29.699234",
+        "slow_success": true,
+        "max_score_turns": 33,
+        "full_status": "solved",
+        "full_success": 1,
+        "full_score_turns": 33,
+        "full_turns": 33,
+        "full_guesses": 32,
+        "full_submits": 1,
+        "full_act_wall_s": "29.699234",
+        "full_last_action": "submit",
+        "full_last_word": "mangs"
+      }
+    },
+    {
+      "secret": "nills",
+      "track": 3,
+      "seed": 0,
+      "reasons": [
+        "slow"
+      ],
+      "original": {
+        "slow_status": "solved",
+        "slow_score_turns": 33,
+        "slow_turns": 33,
+        "slow_act_wall_s": "24.362584",
+        "slow_success": true,
+        "max_score_turns": 33,
+        "full_status": "solved",
+        "full_success": 1,
+        "full_score_turns": 33,
+        "full_turns": 33,
+        "full_guesses": 32,
+        "full_submits": 1,
+        "full_act_wall_s": "24.362584",
+        "full_last_action": "submit",
+        "full_last_word": "nills"
+      }
+    },
+    {
+      "secret": "parks",
+      "track": 3,
+      "seed": 0,
+      "reasons": [
+        "slow"
+      ],
+      "original": {
+        "slow_status": "solved",
+        "slow_score_turns": 33,
+        "slow_turns": 33,
+        "slow_act_wall_s": "29.695749",
+        "slow_success": true,
+        "max_score_turns": 33,
+        "full_status": "solved",
+        "full_success": 1,
+        "full_score_turns": 33,
+        "full_turns": 33,
+        "full_guesses": 32,
+        "full_submits": 1,
+        "full_act_wall_s": "29.695749",
+        "full_last_action": "submit",
+        "full_last_word": "parks"
+      }
+    },
+    {
+      "secret": "baker",
+      "track": 3,
+      "seed": 0,
+      "reasons": [
+        "slow"
+      ],
+      "original": {
+        "slow_status": "solved",
+        "slow_score_turns": 32,
+        "slow_turns": 32,
+        "slow_act_wall_s": "29.417122",
+        "slow_success": true,
+        "max_score_turns": 32,
+        "full_status": "solved",
+        "full_success": 1,
+        "full_score_turns": 32,
+        "full_turns": 32,
+        "full_guesses": 31,
+        "full_submits": 1,
+        "full_act_wall_s": "29.417122",
+        "full_last_action": "submit",
+        "full_last_word": "baker"
+      }
+    },
+    {
+      "secret": "banes",
+      "track": 3,
+      "seed": 0,
+      "reasons": [
+        "slow"
+      ],
+      "original": {
+        "slow_status": "solved",
+        "slow_score_turns": 32,
+        "slow_turns": 32,
+        "slow_act_wall_s": "29.631810",
+        "slow_success": true,
+        "max_score_turns": 32,
+        "full_status": "solved",
+        "full_success": 1,
+        "full_score_turns": 32,
+        "full_turns": 32,
+        "full_guesses": 31,
+        "full_submits": 1,
+        "full_act_wall_s": "29.631810",
+        "full_last_action": "submit",
+        "full_last_word": "banes"
+      }
+    },
+    {
+      "secret": "cells",
+      "track": 3,
+      "seed": 0,
+      "reasons": [
+        "slow"
+      ],
+      "original": {
+        "slow_status": "solved",
+        "slow_score_turns": 32,
+        "slow_turns": 32,
+        "slow_act_wall_s": "23.646742",
+        "slow_success": true,
+        "max_score_turns": 32,
+        "full_status": "solved",
+        "full_success": 1,
+        "full_score_turns": 32,
+        "full_turns": 32,
+        "full_guesses": 31,
+        "full_submits": 1,
+        "full_act_wall_s": "23.646742",
+        "full_last_action": "submit",
+        "full_last_word": "cells"
+      }
+    },
+    {
+      "secret": "hoxed",
+      "track": 3,
+      "seed": 0,
+      "reasons": [
+        "slow"
+      ],
+      "original": {
+        "slow_status": "solved",
+        "slow_score_turns": 32,
+        "slow_turns": 32,
+        "slow_act_wall_s": "29.240040",
+        "slow_success": true,
+        "max_score_turns": 32,
+        "full_status": "solved",
+        "full_success": 1,
+        "full_score_turns": 32,
+        "full_turns": 32,
+        "full_guesses": 31,
+        "full_submits": 1,
+        "full_act_wall_s": "29.240040",
+        "full_last_action": "submit",
+        "full_last_word": "hoxed"
+      }
+    },
+    {
+      "secret": "pocks",
+      "track": 3,
+      "seed": 0,
+      "reasons": [
+        "slow"
+      ],
+      "original": {
+        "slow_status": "solved",
+        "slow_score_turns": 32,
+        "slow_turns": 32,
+        "slow_act_wall_s": "28.352408",
+        "slow_success": true,
+        "max_score_turns": 32,
+        "full_status": "solved",
+        "full_success": 1,
+        "full_score_turns": 32,
+        "full_turns": 32,
+        "full_guesses": 31,
+        "full_submits": 1,
+        "full_act_wall_s": "28.352408",
+        "full_last_action": "submit",
+        "full_last_word": "pocks"
+      }
+    },
+    {
+      "secret": "wacks",
+      "track": 3,
+      "seed": 0,
+      "reasons": [
+        "slow"
+      ],
+      "original": {
+        "slow_status": "solved",
+        "slow_score_turns": 32,
+        "slow_turns": 32,
+        "slow_act_wall_s": "29.580657",
+        "slow_success": true,
+        "max_score_turns": 32,
+        "full_status": "solved",
+        "full_success": 1,
+        "full_score_turns": 32,
+        "full_turns": 32,
+        "full_guesses": 31,
+        "full_submits": 1,
+        "full_act_wall_s": "29.580657",
+        "full_last_action": "submit",
+        "full_last_word": "wacks"
+      }
+    },
+    {
+      "secret": "colls",
+      "track": 3,
+      "seed": 0,
+      "reasons": [
+        "slow"
+      ],
+      "original": {
+        "slow_status": "solved",
+        "slow_score_turns": 31,
+        "slow_turns": 31,
+        "slow_act_wall_s": "22.133582",
+        "slow_success": true,
+        "max_score_turns": 31,
+        "full_status": "solved",
+        "full_success": 1,
+        "full_score_turns": 31,
+        "full_turns": 31,
+        "full_guesses": 30,
+        "full_submits": 1,
+        "full_act_wall_s": "22.133582",
+        "full_last_action": "submit",
+        "full_last_word": "colls"
+      }
+    },
+    {
+      "secret": "lakes",
+      "track": 3,
+      "seed": 0,
+      "reasons": [
+        "slow"
+      ],
+      "original": {
+        "slow_status": "solved",
+        "slow_score_turns": 31,
+        "slow_turns": 31,
+        "slow_act_wall_s": "28.274658",
+        "slow_success": true,
+        "max_score_turns": 31,
+        "full_status": "solved",
+        "full_success": 1,
+        "full_score_turns": 31,
+        "full_turns": 31,
+        "full_guesses": 30,
+        "full_submits": 1,
+        "full_act_wall_s": "28.274658",
+        "full_last_action": "submit",
+        "full_last_word": "lakes"
+      }
+    },
+    {
+      "secret": "mouch",
+      "track": 3,
+      "seed": 0,
+      "reasons": [
+        "slow"
+      ],
+      "original": {
+        "slow_status": "solved",
+        "slow_score_turns": 31,
+        "slow_turns": 31,
+        "slow_act_wall_s": "27.022956",
+        "slow_success": true,
+        "max_score_turns": 31,
+        "full_status": "solved",
+        "full_success": 1,
+        "full_score_turns": 31,
+        "full_turns": 31,
+        "full_guesses": 30,
+        "full_submits": 1,
+        "full_act_wall_s": "27.022956",
+        "full_last_action": "submit",
+        "full_last_word": "mouch"
+      }
+    },
+    {
+      "secret": "sawed",
+      "track": 3,
+      "seed": 0,
+      "reasons": [
+        "slow"
+      ],
+      "original": {
+        "slow_status": "solved",
+        "slow_score_turns": 31,
+        "slow_turns": 31,
+        "slow_act_wall_s": "28.305160",
+        "slow_success": true,
+        "max_score_turns": 31,
+        "full_status": "solved",
+        "full_success": 1,
+        "full_score_turns": 31,
+        "full_turns": 31,
+        "full_guesses": 30,
+        "full_submits": 1,
+        "full_act_wall_s": "28.305160",
+        "full_last_action": "submit",
+        "full_last_word": "sawed"
+      }
+    },
+    {
+      "secret": "stive",
+      "track": 3,
+      "seed": 0,
+      "reasons": [
+        "slow"
+      ],
+      "original": {
+        "slow_status": "solved",
+        "slow_score_turns": 31,
+        "slow_turns": 31,
+        "slow_act_wall_s": "27.921819",
+        "slow_success": true,
+        "max_score_turns": 31,
+        "full_status": "solved",
+        "full_success": 1,
+        "full_score_turns": 31,
+        "full_turns": 31,
+        "full_guesses": 30,
+        "full_submits": 1,
+        "full_act_wall_s": "27.921819",
+        "full_last_action": "submit",
+        "full_last_word": "stive"
+      }
+    }
+  ]
+}

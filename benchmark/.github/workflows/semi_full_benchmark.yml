@@ -1,0 +1,194 @@
+name: semi_full_benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      solver:
+        description: Solver file path
+        required: true
+        default: team00.py
+      words:
+        description: Candidate word list path
+        required: true
+        default: words.txt
+      cases_file:
+        description: Top-50 slow/failed cases JSON
+        required: true
+        default: benchmark/debug_cases_slow_failed_top50.json
+      mode:
+        description: Benchmark mode
+        required: true
+        default: direct
+        type: choice
+        options:
+          - direct
+          - http
+      tracks:
+        description: Tracks to run
+        required: true
+        default: 1,2,3
+      seeds:
+        description: Noise seeds
+        required: true
+        default: "0"
+      hard_count:
+        description: Number of known slow/failed words from cases file
+        required: true
+        default: "50"
+      random_count:
+        description: Number of deterministic random words from words.txt
+        required: true
+        default: "1000"
+      random_seed:
+        description: Random sampling seed
+        required: true
+        default: "20260614"
+      slow_threshold:
+        description: Slow-word score_turns threshold
+        required: true
+        default: "15"
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  semi_full_chunk:
+    name: semi_full chunk ${{ matrix.chunk }} / 20
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        chunk: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then python -m pip install -r requirements.txt; fi
+          python - <<'PY'
+          import importlib.util, subprocess, sys
+          if importlib.util.find_spec('numpy') is None:
+              subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'numpy'])
+          PY
+
+      - name: Run semi_full_benchmark shard
+        run: |
+          OUT_DIR="benchmark/results/semi_full/chunk_${{ matrix.chunk }}"
+          python benchmark/semi_full_benchmark.py run \
+            --solver "${{ inputs.solver }}" \
+            --words "${{ inputs.words }}" \
+            --cases-file "${{ inputs.cases_file }}" \
+            --hard-count "${{ inputs.hard_count }}" \
+            --random-count "${{ inputs.random_count }}" \
+            --random-seed "${{ inputs.random_seed }}" \
+            --tracks "${{ inputs.tracks }}" \
+            --seeds "${{ inputs.seeds }}" \
+            --mode "${{ inputs.mode }}" \
+            --chunk-index "${{ matrix.chunk }}" \
+            --chunk-count 20 \
+            --slow-threshold "${{ inputs.slow_threshold }}" \
+            --problem-id-mode full \
+            --out-dir "$OUT_DIR"
+
+      - name: Upload shard artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: semi-full-chunk-${{ matrix.chunk }}
+          path: benchmark/results/semi_full/chunk_${{ matrix.chunk }}
+          if-no-files-found: warn
+          retention-days: 14
+
+  merge:
+    name: merge semi_full chunks
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs: semi_full_chunk
+    if: always()
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install numpy
+
+      - name: Download shard artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: semi-full-chunk-*
+          path: benchmark/results/semi_full_artifacts
+          merge-multiple: false
+
+      - name: Merge shard results
+        run: |
+          python benchmark/semi_full_benchmark.py merge \
+            --merge-root benchmark/results/semi_full_artifacts \
+            --out-dir benchmark/results/semi_full_merged \
+            --slow-threshold "${{ inputs.slow_threshold }}"
+
+      - name: Write GitHub step summary
+        if: always()
+        run: |
+          python - <<'PY'
+          import json, os, pathlib
+          p = pathlib.Path('benchmark/results/semi_full_merged/summary.json')
+          if not p.exists():
+              print('summary.json not found')
+              raise SystemExit(0)
+          s = json.loads(p.read_text(encoding='utf-8'))
+          summ = s.get('summary', {})
+          overall = summ.get('overall', {})
+          tracks = summ.get('tracks', {})
+          sources = summ.get('sources', {})
+          lines = []
+          lines.append('# semi_full_benchmark summary')
+          lines.append('')
+          lines.append('| Scope | Games | Solved | Failed | Avg score | P95 | P99 | Max |')
+          lines.append('|---|---:|---:|---:|---:|---:|---:|---:|')
+          def add_row(name, d):
+              lines.append(f"| {name} | {d.get('games')} | {d.get('solved')} | {d.get('failed')} | {d.get('avg_score_turns')} | {d.get('p95_score_turns')} | {d.get('p99_score_turns')} | {d.get('max_score_turns')} |")
+          add_row('all', overall)
+          for k in sorted(tracks, key=lambda x: int(x)):
+              add_row(f'T{k}', tracks[k])
+          for k in sorted(sources):
+              add_row(k, sources[k])
+          lines.append('')
+          lines.append(f"Slow words: {s.get('slow_words_count')}  ")
+          lines.append(f"Failed words: {s.get('failed_words_count')}")
+          text = '\n'.join(lines) + '\n'
+          print(text)
+          summary_file = os.environ.get('GITHUB_STEP_SUMMARY')
+          if summary_file:
+              pathlib.Path(summary_file).write_text(text, encoding='utf-8')
+          PY
+
+      - name: Upload merged artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: semi-full-merged
+          path: benchmark/results/semi_full_merged
+          if-no-files-found: warn
+          retention-days: 30
