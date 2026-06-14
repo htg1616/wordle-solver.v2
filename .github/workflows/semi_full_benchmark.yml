@@ -14,7 +14,7 @@ on:
       cases_file:
         description: Top-50 slow/failed cases JSON
         required: true
-        default: benchmark/debug_cases_slow_failed_top50.json
+        default: benchmark/semi_full_hard_top50_cases.json
       mode:
         description: Benchmark mode
         required: true

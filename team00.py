@@ -197,6 +197,8 @@ class NoisyWordleSolver:
         self.force_noise_turns = int(data.get("force_noise_turns", 3) or 3)
         self.max_turns = int(data.get("max_turns", 100) or 100)
         self.track = self._infer_track(self.p_one, self.p_two)
+        self.avg_near2, self.avg_near3 = self._estimate_cluster_profile()
+        self.hard_candidate_mode = self._is_hard_candidate_list()
         self.cfg = self._make_config()
 
         self.row_cache: Dict[int, np.ndarray] = {}
@@ -213,6 +215,7 @@ class NoisyWordleSolver:
         self.static_pool = self._make_static_pool()
         self.prefix_indices = self._make_prefix_indices()
         self.last_action: Optional[dict] = None
+        self.next_forced_probe_idx: Optional[int] = None
 
     @staticmethod
     def _infer_track(p_one: float, p_two: float) -> int:
@@ -222,13 +225,49 @@ class NoisyWordleSolver:
             return 3
         return 2
 
+    def _estimate_cluster_profile(self) -> Tuple[float, float]:
+        """Estimate how clustered the candidate list is.
+
+        Full 12k lists usually contain many broad information probes.  A custom
+        list made only of hard words often has many near-neighbours, so pure
+        posterior-top guessing is dangerous.  We cheaply estimate the average
+        number of words within Hamming distance <=2 and <=3 on a deterministic
+        sample and use it to enable hard-candidate mode.
+        """
+        if self.N <= 1:
+            return 0.0, 0.0
+        sample_n = min(self.N, 384)
+        if sample_n == self.N:
+            sample_idx = np.arange(self.N, dtype=np.int32)
+        else:
+            sample_idx = np.linspace(0, self.N - 1, sample_n, dtype=np.int32)
+        near2_total = 0.0
+        near3_total = 0.0
+        for idx0 in sample_idx:
+            dist = np.count_nonzero(self.enc != self.enc[int(idx0)], axis=1)
+            near2_total += float(np.count_nonzero(dist <= 2) - 1)
+            near3_total += float(np.count_nonzero(dist <= 3) - 1)
+        return near2_total / float(sample_n), near3_total / float(sample_n)
+
+    def _is_hard_candidate_list(self) -> bool:
+        """Detect small or intentionally difficult candidate lists."""
+        if self.N <= 1500:
+            return True
+        if self.N <= 3500 and self.avg_near3 >= 18.0:
+            return True
+        if self.avg_near2 >= 7.0 or self.avg_near3 >= 45.0:
+            return True
+        return False
+
     def _make_config(self) -> SolverConfig:
         max_submit_turn = max(1, min(self.max_turns - 1, 99))
         if self.track == 1:
             prefix = ("tares", "solan", "deils")
             return SolverConfig(
                 track=1, prefix=prefix,
-                pool_size=self._adapt_pool(160), static_pool_size=self._adapt_pool(128), top_post_pool_size=min(96, self.N),
+                pool_size=self._adapt_pool(224 if self.hard_candidate_mode else 160),
+                static_pool_size=self._adapt_pool(192 if self.hard_candidate_mode else 128),
+                top_post_pool_size=min(160 if self.hard_candidate_mode else 96, self.N),
                 min_submit_turn=4, threshold=0.999999, odds_threshold=1e9,
                 topk_confirm=0, topk_mass_min=1.0, retry_gap=0,
                 force_submit_turn=min(40, max_submit_turn), alpha=1.0, mix_epsilon=0.0,
@@ -239,9 +278,13 @@ class NoisyWordleSolver:
             prefix = ("tares", "choli", "bunny")
             return SolverConfig(
                 track=2, prefix=prefix,
-                pool_size=self._adapt_pool(288), static_pool_size=self._adapt_pool(256), top_post_pool_size=min(160, self.N),
-                min_submit_turn=5, threshold=0.995, odds_threshold=500.0,
-                topk_confirm=min(48, self.N), topk_mass_min=0.90, retry_gap=3,
+                pool_size=self._adapt_pool(448 if self.hard_candidate_mode else 288),
+                static_pool_size=self._adapt_pool(384 if self.hard_candidate_mode else 256),
+                top_post_pool_size=min(288 if self.hard_candidate_mode else 160, self.N),
+                min_submit_turn=5, threshold=0.996 if self.hard_candidate_mode else 0.995,
+                odds_threshold=800.0 if self.hard_candidate_mode else 500.0,
+                topk_confirm=(min(self.N, 256) if self.hard_candidate_mode else min(48, self.N)),
+                topk_mass_min=0.96 if self.hard_candidate_mode else 0.90, retry_gap=1 if self.hard_candidate_mode else 3,
                 force_submit_turn=min(70, max_submit_turn), alpha=1.0, mix_epsilon=1e-10,
             )
         # Track 3 is very noisy.  Use the handoff's conservative gate, but exact
@@ -250,17 +293,31 @@ class NoisyWordleSolver:
         prefix = ("tares", "solan", "deils")
         return SolverConfig(
             track=3, prefix=prefix,
-            pool_size=self._adapt_pool(448), static_pool_size=self._adapt_pool(224), top_post_pool_size=min(288, self.N),
-            min_submit_turn=5, threshold=0.985, odds_threshold=120.0,
-            topk_confirm=min(96, self.N), topk_mass_min=0.88, retry_gap=2,
+            pool_size=self._adapt_pool(672 if self.hard_candidate_mode else 448),
+            static_pool_size=self._adapt_pool(384 if self.hard_candidate_mode else 224),
+            top_post_pool_size=min(384 if self.hard_candidate_mode else 288, self.N),
+            min_submit_turn=5, threshold=0.988 if self.hard_candidate_mode else 0.985,
+            odds_threshold=180.0 if self.hard_candidate_mode else 120.0,
+            topk_confirm=(min(self.N, 384) if self.hard_candidate_mode else min(96, self.N)),
+            topk_mass_min=0.94 if self.hard_candidate_mode else 0.88, retry_gap=1 if self.hard_candidate_mode else 2,
             force_submit_turn=min(60, max_submit_turn), alpha=0.95, mix_epsilon=1e-10,
         )
 
     def _adapt_pool(self, target: int) -> int:
-        if self.N <= 250:
+        # Hard-only candidate lists are often much smaller and more clustered than
+        # the full dictionary.  In that regime, evaluating more/all candidate
+        # guesses is worth the extra compute because broad static probes may not
+        # exist in the supplied list.
+        if self.hard_candidate_mode:
+            if self.N <= 1800:
+                return self.N
+            if self.N <= 4000:
+                return min(self.N, max(target, 768))
+            return min(self.N, max(target, 640))
+        if self.N <= 350:
             return self.N
         if self.N <= 1000:
-            return min(self.N, max(target, 192))
+            return min(self.N, max(target, 224))
         return min(self.N, target)
 
     def _make_prefix_schedules(self) -> List[Tuple[Tuple[int, int, int], float]]:
@@ -334,9 +391,64 @@ class NoisyWordleSolver:
         top = top[np.argsort(scores[top])[::-1]]
         return top.astype(np.int32)
 
+    def _initial_entropy_probe_indices(self, count: int = 3) -> List[int]:
+        """Pick robust openers from the supplied candidate list itself.
+
+        When the candidate list contains only hard words, the usual broad opener
+        words may be absent.  For small/clustered lists we spend a little start
+        time selecting candidate guesses that split the provided list well under
+        clean Wordle feedback.  This is intentionally capped so /start_problem
+        remains fast even for medium-sized custom lists.
+        """
+        if self.N <= 1:
+            return [0]
+        pool_limit = 512 if self.hard_candidate_mode else 256
+        if self.N <= pool_limit:
+            pool = np.arange(self.N, dtype=np.int32)
+        else:
+            pool = self.static_pool[:min(len(self.static_pool), pool_limit)].astype(np.int32)
+        weights = np.ones(self.N, dtype=np.float64) / float(self.N)
+        selected: List[int] = []
+        used = set()
+        for _ in range(min(count, self.N)):
+            best_idx = None
+            best_score = -1e100
+            for gi0 in pool:
+                gi = int(gi0)
+                if gi in used:
+                    continue
+                row = self.row(gi)
+                mass = np.bincount(row, weights=weights, minlength=N_PATTERNS).astype(np.float64)
+                score = entropy_from_mass(mass)
+                # Avoid picking three almost identical probes from the same hard
+                # cluster.  The first probe is pure entropy; later probes receive
+                # a small diversity penalty if they are too close to an already
+                # selected opener.
+                for prev in selected:
+                    h = self._hamming_idx(gi, prev)
+                    if h <= 2:
+                        score -= 0.20
+                    elif h == 3:
+                        score -= 0.06
+                if score > best_score:
+                    best_score = score
+                    best_idx = gi
+            if best_idx is None:
+                break
+            selected.append(int(best_idx))
+            used.add(int(best_idx))
+        return selected
+
     def _make_prefix_indices(self) -> List[int]:
         indices: List[int] = []
         used = set()
+        if self.hard_candidate_mode:
+            for idx in self._initial_entropy_probe_indices(count=3):
+                if idx not in used:
+                    indices.append(int(idx))
+                    used.add(int(idx))
+                if len(indices) >= 3:
+                    return indices
         for w in self.cfg.prefix:
             idx = self.word_to_idx.get(w)
             if idx is not None and idx not in used:
@@ -437,53 +549,234 @@ class NoisyWordleSolver:
             accum += prod
         return normalize(accum)
 
-    def _full_exact_topk_confirmation(self, topk: np.ndarray, approx_top: int) -> dict:
-        """Replay untempered exact posterior on the current top-K set only."""
+    def _replay_exact_topk(self, topk: np.ndarray, skip_history_index: Optional[int] = None) -> np.ndarray:
+        """Replay an untempered posterior on a supplied top-K candidate set.
+
+        The original confirmation code replayed the current top-K set once.  For
+        submit safety we also need leave-one-observation-out checks.  This helper
+        keeps the exact first-three forced-noise marginalization, even when one of
+        the prefix observations is skipped: each remaining prefix observation uses
+        the noise type from its actual turn in the joint schedule.
+        """
         K = int(len(topk))
         if K == 0:
-            return {"passed": False, "reason": "empty_topk"}
-        # First three observations: exact joint forced-noise schedule.
-        k_prefix = min(3, len(self.likelihood_history))
-        if k_prefix > 0:
+            return np.zeros(0, dtype=np.float64)
+
+        prefix_items: List[Tuple[int, np.ndarray, np.ndarray, np.ndarray]] = []
+        later_items: List[Tuple[int, np.ndarray, np.ndarray, np.ndarray]] = []
+        for hist_i, (turn0, L0, L1, L2) in enumerate(self.likelihood_history):
+            if skip_history_index is not None and hist_i == int(skip_history_index):
+                continue
+            if int(turn0) <= 3:
+                prefix_items.append((int(turn0), L0, L1, L2))
+            else:
+                later_items.append((int(turn0), L0, L1, L2))
+
+        if prefix_items:
             accum = np.zeros(K, dtype=np.float64)
-            like_by_t = [(L0[topk], L1[topk], L2[topk]) for _, L0, L1, L2 in self.likelihood_history[:k_prefix]]
             for seq, prior in self.prefix_schedules:
                 prod = np.full(K, prior, dtype=np.float64)
-                for t in range(k_prefix):
-                    prod *= like_by_t[t][seq[t]]
+                for turn0, L0, L1, L2 in prefix_items:
+                    noise_type = int(seq[max(0, min(2, turn0 - 1))])
+                    prod *= (L0, L1, L2)[noise_type][topk]
                 accum += prod
             local = normalize(accum)
         else:
             local = np.ones(K, dtype=np.float64) / K
-        # Later observations: independent type mixture.  Track 1 uses clean only.
-        for turn, L0, L1, L2 in self.likelihood_history[k_prefix:]:
+
+        for turn0, L0, L1, L2 in later_items:
             if self.track == 1:
                 like = L0[topk]
             else:
-                p0, p1, p2 = self.type_probs_after_prefix(turn)
+                p0, p1, p2 = self.type_probs_after_prefix(turn0)
                 like = p0 * L0[topk] + p1 * L1[topk] + p2 * L2[topk]
             local = normalize(local * np.maximum(like, 1e-15))
+        return local
+
+    def _local_stats(self, topk: np.ndarray, local: np.ndarray) -> Tuple[int, float, float, float, np.ndarray]:
         order = np.argsort(local)[::-1]
-        winner_local = int(order[0])
-        winner = int(topk[winner_local])
-        pmax = float(local[winner_local])
-        p2 = float(local[int(order[1])]) if K > 1 else 0.0
+        winner = int(topk[int(order[0])])
+        pmax = float(local[int(order[0])])
+        p2 = float(local[int(order[1])]) if len(order) > 1 else 0.0
         odds = pmax / max(p2, 1e-300)
+        return winner, pmax, p2, odds, order
+
+    def _hamming_idx(self, a: int, b: int) -> int:
+        return int(np.count_nonzero(self.enc[int(a)] != self.enc[int(b)]))
+
+    def _letter_overlap_idx(self, a: int, b: int) -> int:
+        return int(np.minimum(self.counts[int(a)], self.counts[int(b)]).sum())
+
+    def _is_close_competitor(self, a: int, b: int) -> bool:
+        """Structural closeness guard for near-neighbour submit failures."""
+        aw = self.words[int(a)]
+        bw = self.words[int(b)]
+        h = self._hamming_idx(a, b)
+        if h <= 2:
+            return True
+        overlap = self._letter_overlap_idx(a, b)
+        if h <= 3 and overlap >= 4:
+            return True
+        if h <= 3 and (aw[:2] == bw[:2] or aw[-2:] == bw[-2:]):
+            return True
+        if self.hard_candidate_mode:
+            # Hard-only lists may be intentionally made of words that share most
+            # letters but differ across several positions.  Treat these as a
+            # submit-risk cluster even when Hamming distance is four.
+            if h <= 4 and overlap >= 4:
+                return True
+            if h <= 4 and (aw[:2] == bw[:2] or aw[-2:] == bw[-2:]):
+                return True
+        return False
+
+    def _close_competitors_from_local(self, topk: np.ndarray, local: np.ndarray, top: int, limit: int = 16) -> List[int]:
+        """Return close alternatives to top, ordered by exact local posterior."""
+        if len(topk) <= 1:
+            return []
+        order = np.argsort(local)[::-1]
+        out: List[int] = []
+        # Very small probabilities can still matter after noisy evidence, but we
+        # do not want to direct-query dozens of posterior dust words.
+        floor = 1e-5 if self.track == 3 else 3e-5
+        for loc in order:
+            idx = int(topk[int(loc)])
+            if idx == int(top):
+                continue
+            if float(local[int(loc)]) < floor and len(out) >= 3:
+                break
+            if self._is_close_competitor(int(top), idx):
+                out.append(idx)
+                if len(out) >= limit:
+                    break
+        return out
+
+    def _find_local_position(self, topk: np.ndarray, idx: int) -> Optional[int]:
+        hits = np.flatnonzero(topk == int(idx))
+        if len(hits) == 0:
+            return None
+        return int(hits[0])
+
+    def _suggest_submit_probe(self, topk: np.ndarray, local: np.ndarray, top: int, close: List[int]) -> int:
+        """Choose the next direct probe after a submit veto."""
+        direct_top = self._direct_query_count(int(top))
+        # T2 failures were mostly early near-neighbour submits; two direct probes
+        # of the proposed top are a cheap calibration step.  T3 is much noisier,
+        # so use three direct probes when a close cluster is still alive.
+        need_top = 3 if self.track == 3 and close else 2
+        if direct_top < need_top:
+            return int(top)
+
+        best_idx = int(top)
+        best_score = -1.0
+        for idx in close[:8]:
+            pos = self._find_local_position(topk, int(idx))
+            if pos is None:
+                continue
+            prob = float(local[pos])
+            dq = self._direct_query_count(int(idx))
+            # Query the most plausible unconfirmed close competitor first.
+            if dq >= (2 if self.track == 3 and prob > 0.01 else 1):
+                continue
+            score = prob / float(dq + 1)
+            if idx not in self.guessed:
+                score *= 1.15
+            if score > best_score:
+                best_score = score
+                best_idx = int(idx)
+        if best_idx != int(top):
+            return best_idx
+        if self.track == 3 and close:
+            return self._endgame_discriminator(int(top), k=min(128, max(32, len(topk))))
+        return int(top)
+
+    def _full_exact_topk_confirmation(self, topk: np.ndarray, approx_top: int, turn: int) -> dict:
+        """Replay exact posterior on top-K and apply conservative submit safety gates."""
+        K = int(len(topk))
+        if K == 0:
+            return {"passed": False, "reason": "empty_topk"}
+
+        local = self._replay_exact_topk(topk)
+        winner, exact_pmax, exact_p2, exact_odds, order = self._local_stats(topk, local)
         topk_mass = float(np.sum(self.pi[topk]))
-        passed = bool(
+        base_pass = bool(
             winner == int(approx_top)
-            and pmax >= self.cfg.threshold
-            and odds >= self.cfg.odds_threshold
+            and exact_pmax >= self.cfg.threshold
+            and exact_odds >= self.cfg.odds_threshold
             and topk_mass >= self.cfg.topk_mass_min
         )
-        return {
-            "passed": passed,
+        info = {
+            "passed": base_pass,
             "winner": winner,
-            "exact_pmax": pmax,
-            "exact_odds": odds,
+            "exact_pmax": exact_pmax,
+            "exact_odds": exact_odds,
             "topk_mass": topk_mass,
             "K": K,
+            "reason": "base_pass" if base_pass else "base_gate",
+            "suggested_probe": int(winner),
         }
+        if not base_pass:
+            info["suggested_probe"] = int(winner if winner != int(approx_top) else approx_top)
+            return info
+
+        if self.track == 1:
+            return info
+
+        close = self._close_competitors_from_local(topk, local, int(approx_top), limit=(24 if self.hard_candidate_mode else 16))
+        info["close_count"] = len(close)
+        if close:
+            direct_top = self._direct_query_count(int(approx_top))
+            need_top = 3 if self.track == 3 else 2
+            if direct_top < need_top:
+                info.update({
+                    "passed": False,
+                    "reason": "need_more_direct_top",
+                    "suggested_probe": int(approx_top),
+                })
+                return info
+
+            # Do not submit while a close competitor with non-negligible exact mass
+            # has never been directly queried.  This is the main fix for the 29
+            # wrong-submit cases, all of which were close-cluster overconfidence.
+            if self.hard_candidate_mode:
+                comp_floor = 2e-5 if self.track == 2 else 5e-6
+                close_scan = 10
+            else:
+                comp_floor = 2e-4 if self.track == 2 else 7e-5
+                close_scan = 6
+            for idx in close[:close_scan]:
+                pos = self._find_local_position(topk, idx)
+                prob = float(local[pos]) if pos is not None else 0.0
+                if prob >= comp_floor and self._direct_query_count(idx) == 0:
+                    info.update({
+                        "passed": False,
+                        "reason": "unqueried_close_competitor",
+                        "suggested_probe": int(idx),
+                    })
+                    return info
+
+            # Leave-one-observation-out stability.  If removing one recent piece of
+            # evidence changes the winner to a close competitor, the posterior is
+            # still brittle, so ask that competitor/top once more instead of
+            # risking a 100-turn wrong submit.
+            stable_until = (30 if self.track == 2 else 40) if self.hard_candidate_mode else (22 if self.track == 2 else 30)
+            if turn < stable_until:
+                start = max(0, len(self.likelihood_history) - 8)
+                for hist_i in range(start, len(self.likelihood_history)):
+                    loo = self._replay_exact_topk(topk, skip_history_index=hist_i)
+                    loo_winner, loo_pmax, _, loo_odds, _ = self._local_stats(topk, loo)
+                    if loo_winner != int(approx_top) and self._is_close_competitor(int(approx_top), loo_winner):
+                        probe = loo_winner if self._direct_query_count(loo_winner) == 0 else int(approx_top)
+                        info.update({
+                            "passed": False,
+                            "reason": "loo_unstable_close_winner",
+                            "suggested_probe": int(probe),
+                            "loo_winner": int(loo_winner),
+                            "loo_odds": float(loo_odds),
+                            "loo_pmax": float(loo_pmax),
+                        })
+                        return info
+
+        return info
 
     def type_probs_after_prefix(self, turn: int) -> Tuple[float, float, float]:
         if self.track == 1:
@@ -544,10 +837,12 @@ class NoisyWordleSolver:
             return None
         force = turn >= self.cfg.force_submit_turn
         gate = pmax >= self.cfg.threshold and odds >= self.cfg.odds_threshold
-        if not force and not gate:
+        if not gate:
+            # A forced wrong submit has the same 100-turn cap as not solving, so
+            # only use the force path at the very end as a last-resort guess.
+            if force and turn >= max(self.max_turns - 1, self.cfg.force_submit_turn):
+                return int(top)
             return None
-        if force:
-            return int(top)
         # Track 3 safety guard: a single noisy observation of the current top
         # answer can make the exact posterior look overconfident.  Before
         # submitting in the high two-letter-noise track, require that the
@@ -562,9 +857,12 @@ class NoisyWordleSolver:
             return None
         K = min(max(2, self.cfg.topk_confirm), self.N)
         topk = np.argpartition(self.pi, -K)[-K:]
-        info = self._full_exact_topk_confirmation(topk.astype(np.int32), int(top))
+        info = self._full_exact_topk_confirmation(topk.astype(np.int32), int(top), int(turn))
         if bool(info.get("passed", False)):
             return int(top)
+        probe = info.get("suggested_probe")
+        if probe is not None and 0 <= int(probe) < self.N:
+            self.next_forced_probe_idx = int(probe)
         self.exact_confirm_veto_until = turn + self.cfg.retry_gap
         return None
 
@@ -693,11 +991,12 @@ class NoisyWordleSolver:
         # word is absent from the candidate list, prefix_indices already falls back
         # to high-coverage candidate words.
         top, pmax, _, _ = posterior_stats(self.pi)
-        # prefix1: Track 1 uses only the first fixed opener, then switches
-        # to posterior-adaptive guessing from turn 2. Tracks 2/3 keep the
-        # original first-three prefix opener behavior for the forced-noise region.
-        prefix_turn_limit = 1 if self.track == 1 else 3
-        if turn <= prefix_turn_limit and turn <= len(self.prefix_indices) and pmax < 0.98:
+        if self.next_forced_probe_idx is not None and turn > 3:
+            gi = int(self.next_forced_probe_idx)
+            self.next_forced_probe_idx = None
+            if 0 <= gi < self.N:
+                return gi
+        if turn <= 3 and turn <= len(self.prefix_indices) and pmax < 0.98:
             gi = int(self.prefix_indices[turn - 1])
             return gi
         # Endgame under T3: two direct top queries are useful for safety, but
@@ -712,19 +1011,34 @@ class NoisyWordleSolver:
                 # the same word.  First try a high-posterior runner-up direct
                 # probe; this specifically cuts cases like footy/zooty/lofty
                 # where the true answer sits at rank 2-5 for several turns.
-                alt = self._alternate_head_probe(int(top), k=14)
+                alt = self._alternate_head_probe(int(top), k=22 if self.hard_candidate_mode else 14)
                 if alt is not None and (pmax < 0.995 or consecutive_top >= 2):
                     return int(alt)
-                if pmax >= 0.985:
-                    return self._endgame_discriminator(int(top), k=96)
+                if pmax >= (0.975 if self.hard_candidate_mode else 0.985):
+                    return self._endgame_discriminator(int(top), k=160 if self.hard_candidate_mode else 96)
             if direct_top < 2 and (pmax >= 0.72 or (pmax >= 0.42 and recent_top < 2)):
                 return int(top)
             if pmax >= 0.55 and recent_top >= 2:
-                alt = self._alternate_head_probe(int(top), k=10)
+                alt = self._alternate_head_probe(int(top), k=18 if self.hard_candidate_mode else 10)
                 if alt is not None:
                     return int(alt)
+                return self._endgame_discriminator(int(top), k=192 if self.hard_candidate_mode else 128)
+        if self.hard_candidate_mode and self.track == 2 and turn >= 5:
+            direct_top, recent_top, consecutive_top = self._top_history_counts(int(top))
+            if pmax >= 0.88 and direct_top < 2:
+                return int(top)
+            if pmax >= 0.74 and recent_top >= 1:
+                alt = self._alternate_head_probe(int(top), k=20)
+                if alt is not None and (pmax < 0.97 or consecutive_top >= 2):
+                    return int(alt)
                 return self._endgame_discriminator(int(top), k=128)
+            if pmax >= 0.55 and len(self.history) >= 4:
+                return self._endgame_discriminator(int(top), k=160)
+
         if self.track == 2 and pmax >= 0.82:
+            # Before submitting T2 near-neighbour cases, maybe_submit() may set a
+            # forced probe.  If not, one extra top query is still the fastest way
+            # to calibrate a high posterior.
             return int(top)
 
         pool = self.choose_pool()
@@ -798,9 +1112,10 @@ class Handler(BaseHTTPRequestHandler):
                 pid = str(data.get("problem_id", "default"))
                 solver = SOLVERS.get(pid)
                 if solver is None:
-                    # Fallback for malformed order: create a one-word dummy would be
-                    # invalid, so return a JSON error instead of crashing.
-                    self._write_json({"action": "submit", "word": "error"}, status=200)
+                    # Unknown problem_id is a protocol error.  Returning a fake
+                    # candidate word such as "error" would itself be an invalid
+                    # action under the grader's candidate-list rule.
+                    self._write_json({"error": "unknown_problem_id"}, status=404)
                     return
                 turn = int(data.get("turn", len(solver.history) + 1) or 1)
                 action = solver.act(turn, data.get("feedback"))
