@@ -1,3 +1,21 @@
+#!/usr/bin/env python3
+"""
+Noisy Wordle solver HTTP server for the DCCP Spring 2026 term project.
+
+This is a self-contained production implementation derived from the junior
+algorithm handoff, but modified for the actual grading protocol:
+  * no external/precomputed matrix files;
+  * candidate words are accepted only through /start_problem;
+  * feedback rows are built lazily and cached;
+  * the first-three-turn forced-noise rule is handled as an exact joint schedule;
+  * Tracks 2/3 use exact collapsed one-/two-letter mutation likelihoods rather
+    than a precomputed empirical confusion matrix.
+
+Run with:
+    python team00.py
+
+If your team number is not 00, rename this file to teamXX.py before submission.
+"""
 from __future__ import annotations
 
 import json
@@ -232,12 +250,22 @@ class NoisyWordleSolver:
         return near2_total / float(sample_n), near3_total / float(sample_n)
 
     def _is_hard_candidate_list(self) -> bool:
-        """Detect small or intentionally difficult candidate lists."""
+        """Detect small or intentionally difficult candidate lists.
+
+        Important: the full benchmark dictionary has about 13k words and many
+        natural near-neighbours.  The old rule used only avg_near2/avg_near3,
+        so the full dictionary was misclassified as hard_candidate_mode=True.
+        That activated very large pools/top-K confirmation and overly conservative
+        close-competitor checks, making T2/T3 much slower.
+
+        Treat only genuinely small or medium custom/adversarial lists as hard.
+        Large full-dictionary lists should use the fast full-list configuration.
+        """
         if self.N <= 1500:
             return True
         if self.N <= 3500 and self.avg_near3 >= 18.0:
             return True
-        if self.avg_near2 >= 7.0 or self.avg_near3 >= 45.0:
+        if self.N <= 5000 and (self.avg_near2 >= 7.0 or self.avg_near3 >= 45.0):
             return True
         return False
 
@@ -425,7 +453,13 @@ class NoisyWordleSolver:
     def _make_prefix_indices(self) -> List[int]:
         indices: List[int] = []
         used = set()
-        if self.hard_candidate_mode:
+        # Use data-driven high-entropy openers for genuinely hard lists, and
+        # also for the large full dictionary in noisy tracks.  The full 12k word
+        # dictionary is not hard-mode for submit/config purposes, but empirical
+        # runs showed that entropy-selected openers (e.g. tares/soare/reais)
+        # beat the hand-written T2/T3 prefixes on the old failed clusters.
+        use_entropy_openers = self.hard_candidate_mode or (self.N > 5000 and self.track in (2, 3))
+        if use_entropy_openers:
             for idx in self._initial_entropy_probe_indices(count=3):
                 if idx not in used:
                     indices.append(int(idx))
@@ -1107,11 +1141,11 @@ class NoisyWordleSolver:
         top_pool = np.argpartition(self.pi, -min(self.N, max(32, pool_limit // 2)))[-min(self.N, max(32, pool_limit // 2)):].astype(np.int32)
         static_keep = self.static_pool[:min(len(self.static_pool), max(16, pool_limit // 2))].astype(np.int32)
         pool = np.unique(np.concatenate([pool.astype(np.int32), top_pool, static_keep, head.astype(np.int32), np.array([int(top)], dtype=np.int32)]))
-        if len(pool) > pool_limit:
+        if len(당구) > pool_limit:
             # Score candidates cheaply for truncation: keep high-posterior answer candidates and static probes.
             bonus = self.pi[pool].astype(np.float64)
             static_set = set(int(x) for x in static_keep)
-            for j, gi in enumerate(pool):
+            for j, gi in enumerate(당구):
                 if int(gi) in static_set:
                     bonus[j] += 0.02
             pool = pool[np.argsort(bonus)[-int(pool_limit):]].astype(np.int32)
